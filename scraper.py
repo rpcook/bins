@@ -6,7 +6,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 import time
-#nothing
+
 class SeleniumScraper:
     # Initialize the web driver for Chrome
     def __init__(self):
@@ -27,7 +27,7 @@ class SeleniumScraper:
         with open("targetURL.txt") as target:
             url = target.read()
         self.driver.get(url)
-        self.parse()
+        #self.parse()
 
     # Helper method to find elements and extract data
     def find_element_by_css(self, css_selector, attribute="text", child_index=None):
@@ -60,6 +60,13 @@ class SeleniumScraper:
         # }
         # print(data)
 
+    def write_source_file(self):
+        with open('scraped_source.htm', 'w') as f:
+            f.write(self.driver.page_source)
+
+    def source(self):
+        return self.driver.page_source
+
     # Close the web driver manually if needed
     def close_spider(self):
         self.driver.quit()
@@ -69,3 +76,5 @@ if __name__ == "__main__":
     # Use 'with' statement for automatic cleanup
     with SeleniumScraper() as scraper:
         scraper.start_requests()
+        time.sleep(2) # wait for page to load
+        scraper.write_source_file()
