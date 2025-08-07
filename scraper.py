@@ -24,7 +24,7 @@ class SeleniumScraper:
     # Start the web scraping process
     def start_requests(self):
         # Open the target webpage
-        with open("targetURL.txt") as target:
+        with open('targetURL.txt') as target:
             url = target.read()
         self.driver.get(url)
         #self.parse()
@@ -41,7 +41,7 @@ class SeleniumScraper:
         self.driver.quit()
 
 # Main execution
-if __name__ == "__main__":
+if __name__ == '__main__':
     # Use 'with' statement for automatic cleanup
     with SeleniumScraper() as scraper:
         scraper.start_requests()
