@@ -29,40 +29,9 @@ class SeleniumScraper:
         self.driver.get(url)
         #self.parse()
 
-    # Helper method to find elements and extract data
-    def find_element_by_css(self, css_selector, attribute="text", child_index=None):
-        # Wait for the element to be present before finding it
-        element = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, css_selector)))
-        # Extract text or attribute based on parameters
-        if attribute == "text":
-            return element.text.replace('\n', ' ').strip() if child_index is None else element.find_elements(By.CSS_SELECTOR, "*")[child_index].strip()
-        return element.get_attribute(attribute)
-
-    # Parse the webpage to extract data
-    def parse(self):
-        # Wait a bit for all elements to fully load
-        time.sleep(2)
-        
-        # data = {
-        #     'date': self.driver.find_element(By.CLASS_NAME, 'value-as-text')
-        # }
-        # print(data)
-
-        source = self.driver.page_source
-        print(source)
-
-        # Extract and print data from the page
-        # data = {
-        #     'name': self.find_element_by_css('h1[data-qa="device-name"]', 'text'),
-        #     'memory': self.find_element_by_css('span[class^="simtype_selectedMemory__"]', 'text'),
-        #     'pay_monthly_price': self.find_element_by_css('p[class^="paymentOptions_subtotalContent__"] > span:nth-child(1)', 'text'),
-        #     'pay_today_price': self.find_element_by_css('p[class^="paymentOptions_subtotalContent__"] > span:nth-child(2) > span', 'text') + "/mo",
-        # }
-        # print(data)
-
     def write_source_file(self):
         with open('scraped_source.htm', 'w') as f:
-            f.write(self.driver.page_source)
+            f.write(self.source())
 
     def source(self):
         return self.driver.page_source
