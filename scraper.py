@@ -132,7 +132,7 @@ def scrape_bin_date_website(street_address=None):
     redirect_url = r3.json()["redirect_url"]
 
     ## Follow redirect
-    r3 = session.post(url_stem+redirect_url, headers=headers)
+    r4 = session.post(url_stem+redirect_url, headers=headers)
 
     ## Bootstrap POST
     payload = {
@@ -140,21 +140,10 @@ def scrape_bin_date_website(street_address=None):
             "_session_storage": '{"_global":{"destination_stack":["w/webpage/find-bin-collection-day-show-details"]}}',
             "_update_page_content_request": "1"
         }
-    r4 = session.post(url_stem+redirect_url, data=payload, headers=headers)
+    r5 = session.post(url_stem+redirect_url, data=payload, headers=headers)
 
-    scraped_source = r4.json()["data"]
+    scraped_source = r5.json()["data"]
     return scraped_source
-
-def dumpSource(fname, source):
-    with open(fname, "w", encoding="UTF-8") as f:
-        f.write(source)
-
-def hex_with_context(text, min_len=16, max_len=70, context=50):
-    patt = rf'\b[a-fA-F0-9]{{{min_len},{max_len}}}\b'
-    for m in re.finditer(patt, text):
-        s, e = m.span()
-        snippet = text[max(0, s-context): min(len(text), e+context)]
-        yield (m.group(0), snippet)
 
 # Main execution
 if __name__ == '__main__':
