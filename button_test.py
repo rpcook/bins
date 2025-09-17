@@ -16,13 +16,14 @@ press_start_time = 0
 single_timer = None
 # event_log = []   # store (event_type, timestamp) tuples
 
-def log_event(event_type):
-    ts = time.monotonic()
-    # event_log.append((event_type, ts))
-    print(f"[{ts:.3f}] {event_type}")
+# def log_event(event_type):
+#     ts = time.monotonic()
+#     # event_log.append((event_type, ts))
+#     print(f"[{ts:.3f}] {event_type}")
 
 def handle_single():
-    print("Single press")
+    if not GPIO.input(BUTTON_PIN) == GPIO.HIGH: # if the button input is still high, do nothing
+        print("Single press")
 
 def handle_double():
     print("Double tap")
@@ -79,9 +80,9 @@ print("Listening for button events... (press any key to exit)")
 try:
     while True:
         # Check if a key was pressed (non-blocking)
-        if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-            break
-        time.sleep(0.1)
+        # if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+        #     break
+        time.sleep(1)
 except KeyboardInterrupt:
     pass
 finally:
