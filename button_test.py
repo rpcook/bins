@@ -7,9 +7,15 @@ import select
 BUTTON_PIN = 5  # BCM numbering
 DOUBLE_TAP_TIME = 0.3   # seconds
 LONG_HOLD_TIME = 0.5    # seconds
+BIN_RED = 10
+BIN_GREEN = 9
+BIN_BLUE = 17
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(BUTTON_PIN, GPIO.IN)
+GPIO.setup(BIN_RED, GPIO.OUT)
+GPIO.setup(BIN_GREEN, GPIO.OUT)
+GPIO.setup(BIN_BLUE, GPIO.OUT)
 
 last_press_time = 0
 press_start_time = 0
@@ -24,12 +30,15 @@ single_timer = None
 def handle_single():
     if not GPIO.input(BUTTON_PIN) == GPIO.HIGH: # if the button input is still high, do nothing
         print("Single press")
+        GPIO.output(BIN_RED, not GPIO.input(BIN_RED))
 
 def handle_double():
     print("Double tap")
+    GPIO.output(BIN_GREEN, not GPIO.input(BIN_GREEN))
 
 def handle_long():
     print("Long hold")
+    GPIO.output(BIN_BLUE, not GPIO.input(BIN_BLUE))
 
 def button_pressed(channel):
     global last_press_time, press_start_time, single_timer
