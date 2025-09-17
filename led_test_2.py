@@ -6,6 +6,7 @@ GPIO.setmode(GPIO.BCM)
 
 BUTTON_PIN = 5  # example pin (BCM numbering)
 BIN_BLUE = 17
+STATUS_GREEN = 9
 
 def button_pressed(channel):
     print("Button released!")
@@ -13,6 +14,7 @@ def button_pressed(channel):
 
 GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(BIN_BLUE, GPIO.OUT)
+GPIO.setup(STATUS_GREEN, GPIO.OUT)
 
 # Set up event detection (both edges or just falling/rising)
 GPIO.add_event_detect(BUTTON_PIN, GPIO.FALLING, callback=button_pressed, bouncetime=200)
@@ -20,6 +22,7 @@ GPIO.add_event_detect(BUTTON_PIN, GPIO.FALLING, callback=button_pressed, bouncet
 
 try:
     while True:
-        time.sleep(1)  # keep the program alive
+        time.sleep(0.5)  # keep the program alive
+        GPIO.output(STATUS_GREEN, not GPIO.input(STATUS_GREEN))
 except KeyboardInterrupt:
     GPIO.cleanup()
