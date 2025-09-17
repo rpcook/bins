@@ -14,11 +14,11 @@ GPIO.setup(BUTTON_PIN, GPIO.IN)
 last_press_time = 0
 press_start_time = 0
 single_timer = None
-event_log = []   # store (event_type, timestamp) tuples
+# event_log = []   # store (event_type, timestamp) tuples
 
 def log_event(event_type):
     ts = time.monotonic()
-    event_log.append((event_type, ts))
+    # event_log.append((event_type, ts))
     print(f"[{ts:.3f}] {event_type}")
 
 def handle_single():
@@ -85,7 +85,7 @@ try:
 except KeyboardInterrupt:
     pass
 finally:
-    print("\nEvent log dump:")
-    for event, ts in event_log:
-        print(f"{ts:.3f}: {event}")
+    # print("\nEvent log dump:")
+    # for event, ts in event_log:
+    #     print(f"{ts:.3f}: {event}")
     GPIO.cleanup()
