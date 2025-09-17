@@ -4,12 +4,19 @@ import time
 GPIO.setmode(GPIO.BCM)
 # GPIO.setmode(GPIO.BOARD)
 
-GPIO.setup(9, GPIO.OUT)
+BUTTON_PIN = 5  # example pin (BCM numbering)
 
-for i in range(5):
-    GPIO.output(9, GPIO.HIGH)
-    time.sleep(0.5)
-    GPIO.output(9, GPIO.LOW)
-    time.sleep(0.5)
+def button_pressed(channel):
+    print("Button pressed!")
 
-GPIO.cleanup()
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+# Set up event detection (both edges or just falling/rising)
+GPIO.add_event_detect(BUTTON_PIN, GPIO.FALLING, callback=button_pressed, bouncetime=200)
+
+try:
+    while True:
+        time.sleep(1)  # keep the program alive
+except KeyboardInterrupt:
+    GPIO.cleanup()
