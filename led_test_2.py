@@ -8,19 +8,15 @@ BUTTON_PIN = 5  # example pin (BCM numbering)
 BIN_BLUE = 17
 
 def button_pressed(channel):
-    print("Button pressed!")
-    GPIO.output(BIN_BLUE, GPIO.HIGH)
-
-def button_released(channel):
     print("Button released!")
-    GPIO.output(BIN_BLUE, GPIO.HIGH)
+    GPIO.output(BIN_BLUE, not GPIO.input(BIN_BLUE))
 
 GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(BIN_BLUE, GPIO.OUT)
 
 # Set up event detection (both edges or just falling/rising)
 GPIO.add_event_detect(BUTTON_PIN, GPIO.FALLING, callback=button_pressed, bouncetime=200)
-GPIO.add_event_detect(BUTTON_PIN, GPIO.RISING, callback=button_released, bouncetime=200)
+# GPIO.add_event_detect(BUTTON_PIN, GPIO.RISING, callback=button_released, bouncetime=200)
 
 try:
     while True:
