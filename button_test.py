@@ -4,7 +4,7 @@ import threading
 import sys
 import select
 
-BUTTON_PIN = 17  # BCM numbering
+BUTTON_PIN = 5  # BCM numbering
 DOUBLE_TAP_TIME = 0.3   # seconds
 LONG_HOLD_TIME = 1.0    # seconds
 
@@ -82,6 +82,8 @@ try:
         if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
             break
         time.sleep(0.1)
+except KeyboardInterrupt:
+    pass
 finally:
     print("\nEvent log dump:")
     for event, ts in event_log:
