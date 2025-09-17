@@ -6,7 +6,7 @@ import select
 
 BUTTON_PIN = 5  # BCM numbering
 DOUBLE_TAP_TIME = 0.3   # seconds
-LONG_HOLD_TIME = 1.0    # seconds
+LONG_HOLD_TIME = 0.5    # seconds
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(BUTTON_PIN, GPIO.IN)
@@ -22,20 +22,20 @@ def log_event(event_type):
     print(f"[{ts:.3f}] {event_type}")
 
 def handle_single():
-    log_event("Single press")
+    print("Single press")
 
 def handle_double():
-    log_event("Double tap")
+    print("Double tap")
 
 def handle_long():
-    log_event("Long hold")
+    print("Long hold")
 
 def button_pressed(channel):
     global last_press_time, press_start_time, single_timer
     press_time = time.monotonic()
     delta = press_time - last_press_time
 
-    log_event("PRESS")
+    # log_event("PRESS")
 
     if delta < DOUBLE_TAP_TIME:
         if single_timer:
@@ -54,7 +54,7 @@ def button_pressed(channel):
 def button_released(channel):
     global press_start_time
     release_time = time.monotonic()
-    log_event("RELEASE")
+    # log_event("RELEASE")
     press_start_time = 0
 
 def check_hold(start_time):
