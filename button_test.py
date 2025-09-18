@@ -1,8 +1,8 @@
 import RPi.GPIO as GPIO
 import time
 import threading
-import sys
-import select
+# import sys
+# import select
 
 BUTTON_PIN = 5  # BCM numbering
 DOUBLE_TAP_TIME = 0.3   # seconds
