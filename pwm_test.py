@@ -18,7 +18,7 @@ GPIO.setup(BIN_GREEN, GPIO.OUT)
 GPIO.setup(BIN_BLUE, GPIO.OUT)
 
 g = GPIO.PWM(BIN_GREEN, 200)
-g.start=0
+g.start(0)
 
 last_press_time = 0
 press_start_time = 0
@@ -96,14 +96,15 @@ try:
         #     break
         for dc in range(0, 101, 5):
             g.ChangeDutyCycle(dc)
-            time.sleep(0.1)
+            time.sleep(0.2)
         for dc in range(100, -1, -5):
             g.ChangeDutyCycle(dc)
-            time.sleep(0.1)
+            time.sleep(0.2)
 except KeyboardInterrupt:
     pass
 finally:
     # print("\nEvent log dump:")
     # for event, ts in event_log:
     #     print(f"{ts:.3f}: {event}")
+    g.stop()
     GPIO.cleanup()
