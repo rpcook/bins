@@ -1,8 +1,6 @@
 import RPi.GPIO as GPIO
 import time
 import threading
-# import sys
-# import select
 
 BUTTON_PIN = 5  # BCM numbering
 DOUBLE_TAP_TIME = 0.3   # seconds
@@ -17,18 +15,19 @@ GPIO.setup(BIN_RED, GPIO.OUT)
 GPIO.setup(BIN_GREEN, GPIO.OUT)
 GPIO.setup(BIN_BLUE, GPIO.OUT)
 
+r = GPIO.PWM(BIN_RED, 200)
 g = GPIO.PWM(BIN_GREEN, 200)
+b = GPIO.PWM(BIN_BLUE, 200)
+r.start(0)
 g.start(0)
+b.start(0)
+
+control_channel = (BIN_RED, BIN_GREEN, BIN_BLUE)
+current_channel = 0
 
 last_press_time = 0
 press_start_time = 0
 single_timer = None
-# event_log = []   # store (event_type, timestamp) tuples
-
-# def log_event(event_type):
-#     ts = time.monotonic()
-#     # event_log.append((event_type, ts))
-#     print(f"[{ts:.3f}] {event_type}")
 
 def handle_single():
     if not GPIO.input(BUTTON_PIN) == GPIO.HIGH: # if the button input is still high, do nothing
@@ -38,6 +37,11 @@ def handle_single():
 def handle_double():
     print("Double tap")
     # GPIO.output(BIN_GREEN, not GPIO.input(BIN_GREEN))
+    current_channel = (current_channel + 1) % 3
+    GPIO.output(BIN_RED, GPIO.LOW)
+    GPIO.output(BIN_GREEN, GPIO.LOW)
+    GPIO.output(BIN_BLUE, GPIO.LOW)
+    GPIO.output(control_channel[current_channel], GPIO.HIGH)
 
 def handle_long():
     print("Long hold")
@@ -87,13 +91,10 @@ GPIO.add_event_callback(
     )
 )
 
-print("Listening for button events... (press any key to exit)")
+print("Listening for button events... (CTRL+C to exit)")
 
 try:
     while True:
-        # Check if a key was pressed (non-blocking)
-        # if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-        #     break
         for dc in range(0, 101, 5):
             g.ChangeDutyCycle(dc)
             time.sleep(0.2)
@@ -103,8 +104,7 @@ try:
 except KeyboardInterrupt:
     pass
 finally:
-    # print("\nEvent log dump:")
-    # for event, ts in event_log:
-    #     print(f"{ts:.3f}: {event}")
+    r.stop()
     g.stop()
+    b.stop()
     GPIO.cleanup()
