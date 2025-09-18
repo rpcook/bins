@@ -35,6 +35,7 @@ def handle_single():
         # GPIO.output(BIN_RED, not GPIO.input(BIN_RED))
 
 def handle_double():
+    global current_channel
     print("Double tap")
     # GPIO.output(BIN_GREEN, not GPIO.input(BIN_GREEN))
     current_channel = (current_channel + 1) % 3
@@ -95,12 +96,13 @@ print("Listening for button events... (CTRL+C to exit)")
 
 try:
     while True:
-        for dc in range(0, 101, 5):
-            g.ChangeDutyCycle(dc)
-            time.sleep(0.2)
-        for dc in range(100, -1, -5):
-            g.ChangeDutyCycle(dc)
-            time.sleep(0.2)
+        # for dc in range(0, 101, 5):
+        #     g.ChangeDutyCycle(dc)
+        #     time.sleep(0.2)
+        # for dc in range(100, -1, -5):
+        #     g.ChangeDutyCycle(dc)
+        #     time.sleep(0.2)
+        time.sleep(1)
 except KeyboardInterrupt:
     pass
 finally:
