@@ -22,7 +22,7 @@ r.start(0)
 g.start(0)
 b.start(0)
 
-control_channel = (BIN_RED, BIN_GREEN, BIN_BLUE)
+control_channel = (r, g, b)
 current_channel = 0
 
 last_press_time = 0
@@ -39,10 +39,14 @@ def handle_double():
     print("Double tap")
     # GPIO.output(BIN_GREEN, not GPIO.input(BIN_GREEN))
     current_channel = (current_channel + 1) % 3
-    GPIO.output(BIN_RED, GPIO.LOW)
-    GPIO.output(BIN_GREEN, GPIO.LOW)
-    GPIO.output(BIN_BLUE, GPIO.LOW)
-    GPIO.output(control_channel[current_channel], GPIO.HIGH)
+    r.ChangeDutyCycle(0)
+    g.ChangeDutyCycle(0)
+    b.ChangeDutyCycle(0)
+    control_channel[current_channel].ChangeDutyCycle(100)
+    # GPIO.output(BIN_RED, GPIO.LOW)
+    # GPIO.output(BIN_GREEN, GPIO.LOW)
+    # GPIO.output(BIN_BLUE, GPIO.LOW)
+    # GPIO.output(control_channel[current_channel], GPIO.HIGH)
 
 def handle_long():
     print("Long hold")
