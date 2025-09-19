@@ -23,33 +23,52 @@ g.start(0)
 b.start(0)
 
 control_channel = (r, g, b)
+pwm_value = [0, 0, 0]
 current_channel = 0
+pwm_direction = True
 
 last_press_time = 0
 press_start_time = 0
 single_timer = None
 
 def handle_single():
+    global pwm_value
     if not GPIO.input(BUTTON_PIN) == GPIO.HIGH: # if the button input is still high, do nothing
-        print("Single press")
+        print("Single press, RGB values:")
+        print(pwm_value)
         # GPIO.output(BIN_RED, not GPIO.input(BIN_RED))
 
 def handle_double():
     global current_channel
-    print("Double tap")
+    print("Double tap, changing colour control channel.")
     # GPIO.output(BIN_GREEN, not GPIO.input(BIN_GREEN))
     current_channel = (current_channel + 1) % 3
-    r.ChangeDutyCycle(0)
-    g.ChangeDutyCycle(0)
-    b.ChangeDutyCycle(0)
-    control_channel[current_channel].ChangeDutyCycle(100)
+    #r.ChangeDutyCycle(0)
+    #g.ChangeDutyCycle(0)
+    #b.ChangeDutyCycle(0)
+    #control_channel[current_channel].ChangeDutyCycle(100)
     # GPIO.output(BIN_RED, GPIO.LOW)
     # GPIO.output(BIN_GREEN, GPIO.LOW)
     # GPIO.output(BIN_BLUE, GPIO.LOW)
     # GPIO.output(control_channel[current_channel], GPIO.HIGH)
 
 def handle_long():
-    print("Long hold")
+    global pwm_value, pwm_direction
+    #print("Long hold")
+    while GPIO.input(BUTTON_PIN) == GPIO.HIGH:
+        #print("still held")
+        if pwm_direction:
+            pwm_value[current_channel] += 2
+            if pwm_value[current_channel] > 100:
+                pwm_value[current_channel] = 100
+        else:
+            pwm_value[current_channel] -= 2
+            if pwm_value[current_channel] < 0:
+                pwm_value[current_channel] = 0
+        for i in range(3):
+            control_channel[i].ChangeDutyCycle(pwm_value[i])
+        time.sleep(0.1)
+    pwm_direction = not pwm_direction
     # GPIO.output(BIN_BLUE, not GPIO.input(BIN_BLUE))
 
 def button_pressed(channel):
@@ -75,15 +94,17 @@ def button_pressed(channel):
 
 def button_released(channel):
     global press_start_time
-    release_time = time.monotonic()
+    # release_time = time.monotonic()
     # log_event("RELEASE")
     press_start_time = 0
+    # if single_timer:
+    #     single_timer.cancel()
 
 def check_hold(start_time):
     # if button still held after LONG_HOLD_TIME, it's a long hold
     if GPIO.input(BUTTON_PIN) == GPIO.HIGH and press_start_time == start_time:
-        if single_timer:
-            single_timer.cancel()
+        # if single_timer:
+        #     single_timer.cancel()
         handle_long()
 
 # Set up event detection for both edges
