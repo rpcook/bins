@@ -1,10 +1,8 @@
-import re
-# from datetime import datetime
-
 import requests
 from bs4 import BeautifulSoup
 import html
 import json
+import re
 
 def scrape_bin_date_website(street_address=None):
     # TODO: think about error handling and return value(s)
@@ -68,12 +66,6 @@ def scrape_bin_date_website(street_address=None):
         "Origin": "https://waste.nc.north-herts.gov.uk",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
         "X-Requested-With": "XMLHttpRequest",
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"',
     }
 
     data = {
