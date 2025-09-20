@@ -21,7 +21,7 @@ Web scraper to determine next collection hosted on a Raspberry Pi. On the day be
 - ~~Test PWM LED control~~
   - ~~Capture relevant colour codes~~
 - ~~Write web scraper~~
-- Write web parser
+- ~~Write web parser~~
 - Design software architecture
 - Implement basic functionality
 
@@ -33,6 +33,7 @@ Web scraper to determine next collection hosted on a Raspberry Pi. On the day be
 - Build bin model
 - Install bin model
 - Error handling
+- Robust watchdog etc
 - Catch maintenance mode on website
 - Logging
   - Management of log size
