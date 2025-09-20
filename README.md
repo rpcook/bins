@@ -18,8 +18,8 @@ Web scraper to determine next collection hosted on a Raspberry Pi. On the day be
 - ~~Build prototype~~
 - ~~Test prototype basic functionality~~
 - ~~Write button handler (single, double, long-press)~~
-- Test PWM LED control
-  - Capture relevant colour codes
+- ~~Test PWM LED control~~
+  - ~~Capture relevant colour codes~~
 - ~~Write web scraper~~
 - Write web parser
 - Design software architecture
