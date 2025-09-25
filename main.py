@@ -101,13 +101,16 @@ def web_scrape(sched):
     global date_information_int
     sched.statusLED.push(5, "Web scrape running")
     log_stuff("[Scraper] Starting web scrape...")
-    with open("address.txt") as f:
-        source = scraper.scrape_bin_date_website(f.readline())
-    date_information_dict = webparser.parse_bin_table_to_dict(source)
-    date_information_int = webparser.parse_dates(date_information_dict)
-    print(date_information_int)
-    # time.sleep(5)
-    log_stuff("[Scraper] Finished web scrape.")
+    try:
+        with open("address.txt") as f:
+            source = scraper.scrape_bin_date_website(f.readline())
+        date_information_dict = webparser.parse_bin_table_to_dict(source)
+        date_information_int = webparser.parse_dates(date_information_dict)
+        print(date_information_int)
+        # time.sleep(5)
+        log_stuff("[Scraper] Finished web scrape.")
+    except:
+        log_stuff("[Scraper] Fatal error in scraper")
     sched.statusLED.pop("Web scrape running")
     # schedule follow-up
     # sched.schedule(datetime.now() + timedelta(seconds=10), follow_up, sched)
