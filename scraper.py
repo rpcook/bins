@@ -70,7 +70,7 @@ def scrape_bin_date_website(street_address=None):
 
     data = {
         "levels": levels,
-        "search_string": street_address,
+        "search_string": street_address.rstrip("\n"),
         "display_limit": "75",
         "presenter_settings[records_limit]": "75",
         "presenter_settings[load_more_records_label]": "Click here to load more addresses",
