@@ -15,10 +15,22 @@ except ImportError:
 import scraper
 import webparser
 
+# ------------- Configuration variables --------------
+start_bin_schedule = 16
+stop_bin_schedule = 23
+bin_colours = {"black"  : (100,100,100), 
+               "brown"  : (100,  0,  0),
+               "blue"   : (  0,  0,100),
+               "purple" : (  0,100,100)
+               }
+
 # ---------------- Global variables ----------------
 date_information_int = []
 bin_display_state = True
-bin_schedule_state = True
+if datetime.now().hour >= start_bin_schedule and datetime.now().hour < stop_bin_schedule:
+    bin_schedule_state = True
+else:
+    bin_schedule_state = False
 
 # --------------- Configure GPIO -------------------
 GPIO.setmode(GPIO.BCM) # BCM numbering
@@ -29,19 +41,19 @@ BIN_RED = 10
 BIN_GREEN = 9
 BIN_BLUE = 17
 
-
 GPIO.setup(BUTTON_PIN, GPIO.IN)
 GPIO.setup(STATUS_GREEN_BAR, GPIO.OUT)
 GPIO.setup(BIN_RED, GPIO.OUT)
 GPIO.setup(BIN_GREEN, GPIO.OUT)
 GPIO.setup(BIN_BLUE, GPIO.OUT)
 
-r = GPIO.PWM(BIN_RED, 200)
-g = GPIO.PWM(BIN_GREEN, 200)
-b = GPIO.PWM(BIN_BLUE, 200)
-r.start(0)
-g.start(0)
-b.start(0)
+bin_r = GPIO.PWM(BIN_RED, 200)
+bin_g = GPIO.PWM(BIN_GREEN, 200)
+bin_b = GPIO.PWM(BIN_BLUE, 200)
+bin_r.start(0)
+bin_g.start(0)
+bin_b.start(0)
+bin_indicator = (bin_r, bin_g, bin_b)
 
 # ---------------- Status LED Manager ----------------
 class statusLEDManager:
@@ -133,8 +145,7 @@ def web_scrape(sched):
             source = scraper.scrape_bin_date_website(f.readline())
         date_information_dict = webparser.parse_bin_table_to_dict(source)
         date_information_int = webparser.parse_dates(date_information_dict)
-        print(date_information_int)
-        # time.sleep(5)
+        # print(date_information_int)
         log_stuff("[Scraper] Successfully finished web scrape.")
         # reschedule scraping for 12pm
         log_stuff("[Scraper] Rescheduling for 12pm")
@@ -145,8 +156,6 @@ def web_scrape(sched):
         log_stuff("[Scraper] Rescheduling for 10 minutes time")
         sched.schedule(datetime.now() + timedelta(minutes=10), web_scrape, sched)
     sched.statusLED.pop("Web scrape running")
-    # schedule follow-up
-    # sched.schedule(datetime.now() + timedelta(seconds=10), follow_up, sched)
 
 def show_bin_indicator(sched):
     global bin_schedule_state, bin_display_state
@@ -155,7 +164,7 @@ def show_bin_indicator(sched):
     update_bin_indicator()
     time.sleep(10)
     log_stuff("[Main] Bin indicator on for 4pm")
-    sched.schedule(next_schedule_time(16), show_bin_indicator, sched)
+    sched.schedule(next_schedule_time(start_bin_schedule), show_bin_indicator, sched)
     # print(date_information_int)
 
 def hide_bin_indicator(sched):
@@ -164,11 +173,10 @@ def hide_bin_indicator(sched):
     update_bin_indicator()
     time.sleep(10)
     log_stuff("[Main] Bin indicator off at 11pm")
-    sched.schedule(next_schedule_time(23), hide_bin_indicator, sched)
-    # print(date_information_int)
+    sched.schedule(next_schedule_time(stop_bin_schedule), hide_bin_indicator, sched)
 
 def POST(sched):
-    # blink bin indicator
+    # blink bin indicator, pretty rainbow and stuff
     pass
 
 # ------- Helper functions --------
@@ -187,10 +195,19 @@ def button_pressed():
 
 def update_bin_indicator():
     # TODO: check if next bin is tomorrow, look-up colour, set PWM values
+
     if bin_display_state and bin_schedule_state:
         log_stuff("[Bin] Updating indicator illumination")
+        today_int = int(datetime.now().timestamp()/86400)
+        for bin in ("black", "brown", "blue", "purple"):
+            if today_int + 3 == date_information_int[bin]:
+                print(bin_colours[bin])
+                for i in range(3):
+                    bin_indicator[i].ChangeDutyCycle(bin_colours[bin][i])
     else:
         log_stuff("[Bin] Turning off bin indicator")
+        for LED_channel in bin_indicator:
+            LED_channel.ChangeDutyCycle(0)
 
 def check_scheduler(sched):
     # debug check
@@ -205,15 +222,16 @@ if __name__ == "__main__":
     # Kick off initial jobs
     sched.schedule(datetime.now() + timedelta(seconds=1), heartbeat, sched)
     sched.schedule(datetime.now() + timedelta(seconds=2), web_scrape, sched)
+    sched.schedule(datetime.now() + timedelta(seconds=10), update_bin_indicator)
 
     # Schedule bin indicator illumination
     log_stuff("[Main] Bin indicator on for 4pm")
-    sched.schedule(next_schedule_time(16), show_bin_indicator, sched)
+    sched.schedule(next_schedule_time(start_bin_schedule), show_bin_indicator, sched)
     log_stuff("[Main] Bin indicator off at 11pm")
-    sched.schedule(next_schedule_time(23), hide_bin_indicator, sched)
+    sched.schedule(next_schedule_time(stop_bin_schedule), hide_bin_indicator, sched)
 
     # button listener
-    # Set up event detection for both edges
+    # Set up event detection for rising edge
     GPIO.add_event_detect(BUTTON_PIN, GPIO.RISING, bouncetime=10)
 
     GPIO.add_event_callback(BUTTON_PIN, lambda ch: button_pressed())
@@ -222,7 +240,7 @@ if __name__ == "__main__":
         sched.run()
     except KeyboardInterrupt:
         sched.stop()
-        r.stop()
-        g.stop()
-        b.stop()
+        bin_r.stop()
+        bin_g.stop()
+        bin_b.stop()
         GPIO.cleanup()
