@@ -221,7 +221,7 @@ if __name__ == "__main__":
     # Set up event detection for both edges
     GPIO.add_event_detect(BUTTON_PIN, GPIO.RISING, bouncetime=10)
 
-    GPIO.add_event_callback(BUTTON_PIN, lambda ch: button_pressed(ch))
+    GPIO.add_event_callback(BUTTON_PIN, button_pressed())
 
     try:
         sched.run()
