@@ -8,18 +8,7 @@ from datetime import datetime, timedelta
 try:
     import RPi.GPIO as GPIO
 except ImportError:
-    class MockGPIO:
-        BCM = "BCM"
-        OUT = "OUT"
-        HIGH = 1
-        LOW = 0
-
-        def setmode(self, mode): print(f"[MockGPIO] setmode({mode})")
-        def setup(self, pin, mode): print(f"[MockGPIO] setup(pin={pin}, mode={mode})")
-        def output(self, pin, state): print(f"[MockGPIO] output(pin={pin}, state={state})")
-        def cleanup(self): print("[MockGPIO] cleanup()")
-        def input(self, pin): print(f"[MockGPIO] output(pin={pin})")
-
+    from MockGPIO import MockGPIO
     GPIO = MockGPIO()
 
 # ---------------- Custom Packages -------------------
@@ -126,7 +115,7 @@ class Scheduler:
 def log_stuff(message):
     print(f"[{datetime.now()}] " + message)
 
-# ---------------- Example Jobs ----------------
+# -------------- Event Tasks ----------------
 def heartbeat(sched):
     sched.statusLED.push(1, "Heartbeat")
     # log_stuff("[LED] Heartbeat blink")
@@ -160,27 +149,27 @@ def web_scrape(sched):
     # sched.schedule(datetime.now() + timedelta(seconds=10), follow_up, sched)
 
 def show_bin_indicator(sched):
-    global bin_schedule_state
+    global bin_schedule_state, bin_display_state
     bin_schedule_state = True
+    bin_display_state = True
     update_bin_indicator()
+    time.sleep(10)
+    log_stuff("[Main] Bin indicator on for 4pm")
+    sched.schedule(next_schedule_time(16), show_bin_indicator, sched)
     # print(date_information_int)
 
 def hide_bin_indicator(sched):
     global bin_schedule_state
     bin_schedule_state = False
     update_bin_indicator()
+    time.sleep(10)
+    log_stuff("[Main] Bin indicator off at 11pm")
+    sched.schedule(next_schedule_time(23), hide_bin_indicator, sched)
     # print(date_information_int)
 
 def POST(sched):
     # blink bin indicator
     pass
-
-# def follow_up(sched):
-#     sched.statusLED.push(3, "Follow-up task")
-#     print(f"[{datetime.now()}] Running follow-up...")
-#     time.sleep(2)
-#     print(f"[{datetime.now()}] Follow-up done.")
-#     sched.statusLED.pop("Follow-up task")
 
 # ------- Helper functions --------
 def next_schedule_time(hour):
@@ -197,10 +186,16 @@ def button_pressed():
     log_stuff("button pressed")
 
 def update_bin_indicator():
+    # TODO: check if next bin is tomorrow, look-up colour, set PWM values
     if bin_display_state and bin_schedule_state:
         log_stuff("[Bin] Updating indicator illumination")
     else:
         log_stuff("[Bin] Turning off bin indicator")
+
+def check_scheduler(sched):
+    # debug check
+    for task in sched.events:
+        print(task)
 
 # ---------------- Main ----------------
 if __name__ == "__main__":
@@ -215,7 +210,7 @@ if __name__ == "__main__":
     log_stuff("[Main] Bin indicator on for 4pm")
     sched.schedule(next_schedule_time(16), show_bin_indicator, sched)
     log_stuff("[Main] Bin indicator off at 11pm")
-    sched.schedule(next_schedule_time(16), hide_bin_indicator, sched)
+    sched.schedule(next_schedule_time(23), hide_bin_indicator, sched)
 
     # button listener
     # Set up event detection for both edges
