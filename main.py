@@ -198,9 +198,11 @@ def update_bin_indicator():
 
     if bin_display_state and bin_schedule_state:
         log_stuff("[Bin] Updating indicator illumination")
+        if len(date_information_int) == 0:
+            return
         today_int = int(datetime.now().timestamp()/86400)
-        for bin in ("black", "brown", "blue", "purple"):
-            if today_int + 3 == date_information_int[bin]:
+        for bin in bin_colours.keys():
+            if today_int + 1 == date_information_int[bin]:
                 print(bin_colours[bin])
                 for i in range(3):
                     bin_indicator[i].ChangeDutyCycle(bin_colours[bin][i])
