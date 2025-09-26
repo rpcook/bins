@@ -22,8 +22,8 @@ Web scraper to determine next collection hosted on a Raspberry Pi. On the day be
   - ~~Capture relevant colour codes~~
 - ~~Write web scraper~~
 - ~~Write web parser~~
-- Design software architecture
-- Implement basic functionality
+- ~~Design software architecture~~
+- ~~Implement basic functionality~~
 
 ## Complete build
 - Build base
