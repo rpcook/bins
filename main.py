@@ -3,7 +3,24 @@ import heapq
 import threading
 import time
 from datetime import datetime, timedelta
-import RPi.GPIO as GPIO
+
+# ---- GPIO library with mock for PC development ----
+try:
+    import RPi.GPIO as GPIO
+except ImportError:
+    class MockGPIO:
+        BCM = "BCM"
+        OUT = "OUT"
+        HIGH = 1
+        LOW = 0
+
+        def setmode(self, mode): print(f"[MockGPIO] setmode({mode})")
+        def setup(self, pin, mode): print(f"[MockGPIO] setup(pin={pin}, mode={mode})")
+        def output(self, pin, state): print(f"[MockGPIO] output(pin={pin}, state={state})")
+        def cleanup(self): print("[MockGPIO] cleanup()")
+        def input(self, pin): print(f"[MockGPIO] output(pin={pin})")
+
+    GPIO = MockGPIO()
 
 # ---------------- Custom Packages -------------------
 import scraper
@@ -15,9 +32,9 @@ date_information_int = []
 # --------------- Configure GPIO -------------------
 GPIO.setmode(GPIO.BCM)
 
-STATUS_GREEN = 18
+STATUS_GREEN_BAR = 18
 
-GPIO.setup(STATUS_GREEN, GPIO.OUT)
+GPIO.setup(STATUS_GREEN_BAR, GPIO.OUT)
 
 # ---------------- Status LED Manager ----------------
 class statusLEDManager:
@@ -28,7 +45,7 @@ class statusLEDManager:
     def push(self, priority, message):
         with self.lock:
             if not self.stack or priority >= self.stack[-1][0]:
-                log_stuff(f"[LED] Pushed {message} (priority {priority})")
+                # log_stuff(f"[LED] Pushed {message} (priority {priority})")
                 self.stack.append((priority, message))
                 self._update_led()
             else:
@@ -39,18 +56,21 @@ class statusLEDManager:
             for i in range(len(self.stack) - 1, -1, -1):
                 if self.stack[i][1] == message:
                     removed = self.stack.pop(i)
-                    log_stuff(f"[LED] Popped {removed}")
+                    # log_stuff(f"[LED] Popped {removed}")
                     break
             self._update_led()
 
     def _update_led(self):
         if self.stack:
             top = self.stack[-1]
-            log_stuff(f"[LED] Active: {top[1]} (priority {top[0]})")
+            # log_stuff(f"[LED] Active: {top[1]} (priority {top[0]})")
             # here you would actually set the GPIO LED
-            GPIO.output(STATUS_GREEN, not GPIO.input(STATUS_GREEN))
+            GPIO.output(STATUS_GREEN_BAR, False)
+            time.sleep(0.2)
+            GPIO.output(STATUS_GREEN_BAR, True)
         else:
-            log_stuff("[LED] Off")
+            # log_stuff("[LED] Off")
+            pass
 
 # ---------------- Scheduler ----------------
 class Scheduler:
@@ -91,11 +111,11 @@ def log_stuff(message):
 # ---------------- Example Jobs ----------------
 def heartbeat(sched):
     sched.statusLED.push(1, "Heartbeat")
-    log_stuff("[LED] Heartbeat blink")
+    # log_stuff("[LED] Heartbeat blink")
     time.sleep(0.2)
     sched.statusLED.pop("Heartbeat")
     # reschedule itself
-    sched.schedule(datetime.now() + timedelta(seconds=3), heartbeat, sched)
+    sched.schedule(datetime.now() + timedelta(seconds=10), heartbeat, sched)
 
 def web_scrape(sched):
     global date_information_int
@@ -122,12 +142,12 @@ def POST(sched):
     # blink bin indicator
     pass
 
-def follow_up(sched):
-    sched.statusLED.push(3, "Follow-up task")
-    print(f"[{datetime.now()}] Running follow-up...")
-    time.sleep(2)
-    print(f"[{datetime.now()}] Follow-up done.")
-    sched.statusLED.pop("Follow-up task")
+# def follow_up(sched):
+#     sched.statusLED.push(3, "Follow-up task")
+#     print(f"[{datetime.now()}] Running follow-up...")
+#     time.sleep(2)
+#     print(f"[{datetime.now()}] Follow-up done.")
+#     sched.statusLED.pop("Follow-up task")
 
 # ---------------- Main ----------------
 if __name__ == "__main__":
