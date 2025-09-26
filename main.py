@@ -16,13 +16,14 @@ import scraper
 import webparser
 
 # ------------- Configuration variables --------------
-start_bin_schedule = 16
-stop_bin_schedule = 23
-bin_colours = {"black"  : (100,100,100), 
-               "brown"  : (100,  0,  0),
-               "blue"   : (  0,  0,100),
-               "purple" : (  0,100,100)
-               }
+start_bin_schedule = 16 # 24 hour clock
+stop_bin_schedule = 23 # 24 hour clock
+bin_colours = {
+    "black"  : (100,100,100), 
+    "brown"  : (100, 38,  0),
+    "blue"   : (  0,  0,100),
+    "purple" : (100,  0,100)
+    }
 
 # ---------------- Global variables ----------------
 date_information_int = []
@@ -35,24 +36,29 @@ else:
 # --------------- Configure GPIO -------------------
 GPIO.setmode(GPIO.BCM) # BCM numbering
 
+# physical pin assignments
 BUTTON_PIN = 5
 STATUS_GREEN_BAR = 18
 BIN_RED = 10
 BIN_GREEN = 9
 BIN_BLUE = 17
 
+# configure pin directions
 GPIO.setup(BUTTON_PIN, GPIO.IN)
 GPIO.setup(STATUS_GREEN_BAR, GPIO.OUT)
 GPIO.setup(BIN_RED, GPIO.OUT)
 GPIO.setup(BIN_GREEN, GPIO.OUT)
 GPIO.setup(BIN_BLUE, GPIO.OUT)
 
+# configure pwm pins
 bin_r = GPIO.PWM(BIN_RED, 200)
 bin_g = GPIO.PWM(BIN_GREEN, 200)
 bin_b = GPIO.PWM(BIN_BLUE, 200)
 bin_r.start(0)
 bin_g.start(0)
 bin_b.start(0)
+
+# tuple for bin led control
 bin_indicator = (bin_r, bin_g, bin_b)
 
 # ---------------- Status LED Manager ----------------
@@ -190,12 +196,11 @@ def next_schedule_time(hour):
 def button_pressed():
     global bin_display_state
     bin_display_state = not bin_display_state
-    update_bin_indicator()
     log_stuff("button pressed")
+    update_bin_indicator()
+    log_stuff(str(bin_display_state))
 
 def update_bin_indicator():
-    # TODO: check if next bin is tomorrow, look-up colour, set PWM values
-
     if bin_display_state and bin_schedule_state:
         log_stuff("[Bin] Updating indicator illumination")
         if len(date_information_int) == 0:
@@ -203,7 +208,7 @@ def update_bin_indicator():
         today_int = int(datetime.now().timestamp()/86400)
         for bin in bin_colours.keys():
             if today_int + 1 == date_information_int[bin]:
-                print(bin_colours[bin])
+                # print(bin_colours[bin])
                 for i in range(3):
                     bin_indicator[i].ChangeDutyCycle(bin_colours[bin][i])
     else:
