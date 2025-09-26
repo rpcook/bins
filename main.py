@@ -28,13 +28,31 @@ import webparser
 
 # ---------------- Global variables ----------------
 date_information_int = []
+bin_display_state = True
+bin_schedule_state = True
 
 # --------------- Configure GPIO -------------------
-GPIO.setmode(GPIO.BCM)
+GPIO.setmode(GPIO.BCM) # BCM numbering
 
+BUTTON_PIN = 5
 STATUS_GREEN_BAR = 18
+BIN_RED = 10
+BIN_GREEN = 9
+BIN_BLUE = 17
 
+
+GPIO.setup(BUTTON_PIN, GPIO.IN)
 GPIO.setup(STATUS_GREEN_BAR, GPIO.OUT)
+GPIO.setup(BIN_RED, GPIO.OUT)
+GPIO.setup(BIN_GREEN, GPIO.OUT)
+GPIO.setup(BIN_BLUE, GPIO.OUT)
+
+r = GPIO.PWM(BIN_RED, 200)
+g = GPIO.PWM(BIN_GREEN, 200)
+b = GPIO.PWM(BIN_BLUE, 200)
+r.start(0)
+g.start(0)
+b.start(0)
 
 # ---------------- Status LED Manager ----------------
 class statusLEDManager:
@@ -66,7 +84,7 @@ class statusLEDManager:
             # log_stuff(f"[LED] Active: {top[1]} (priority {top[0]})")
             # here you would actually set the GPIO LED
             GPIO.output(STATUS_GREEN_BAR, False)
-            time.sleep(0.2)
+            time.sleep(0.05)
             GPIO.output(STATUS_GREEN_BAR, True)
         else:
             # log_stuff("[LED] Off")
@@ -128,15 +146,30 @@ def web_scrape(sched):
         date_information_int = webparser.parse_dates(date_information_dict)
         print(date_information_int)
         # time.sleep(5)
-        log_stuff("[Scraper] Finished web scrape.")
+        log_stuff("[Scraper] Successfully finished web scrape.")
+        # reschedule scraping for 12pm
+        log_stuff("[Scraper] Rescheduling for 12pm")
+        sched.schedule(next_schedule_time(12), web_scrape, sched)
     except:
         log_stuff("[Scraper] Fatal error in scraper")
+        # reschedule for 10 minutes time
+        log_stuff("[Scraper] Rescheduling for 10 minutes time")
+        sched.schedule(datetime.now() + timedelta(minutes=10), web_scrape, sched)
     sched.statusLED.pop("Web scrape running")
     # schedule follow-up
     # sched.schedule(datetime.now() + timedelta(seconds=10), follow_up, sched)
 
-def update_bin_indicator(sched):
-    print(date_information_int)
+def show_bin_indicator(sched):
+    global bin_schedule_state
+    bin_schedule_state = True
+    update_bin_indicator()
+    # print(date_information_int)
+
+def hide_bin_indicator(sched):
+    global bin_schedule_state
+    bin_schedule_state = False
+    update_bin_indicator()
+    # print(date_information_int)
 
 def POST(sched):
     # blink bin indicator
@@ -149,6 +182,26 @@ def POST(sched):
 #     print(f"[{datetime.now()}] Follow-up done.")
 #     sched.statusLED.pop("Follow-up task")
 
+# ------- Helper functions --------
+def next_schedule_time(hour):
+    now = datetime.now()
+    run_at = now.replace(hour=hour, minute=0, second=0)
+    if run_at < now:
+        run_at += timedelta(days=1)
+    return run_at
+
+def button_pressed():
+    global bin_display_state
+    bin_display_state = not bin_display_state
+    update_bin_indicator()
+    log_stuff("button pressed")
+
+def update_bin_indicator():
+    if bin_display_state and bin_schedule_state:
+        log_stuff("[Bin] Updating indicator illumination")
+    else:
+        log_stuff("[Bin] Turning off bin indicator")
+
 # ---------------- Main ----------------
 if __name__ == "__main__":
     statusLED = statusLEDManager()
@@ -158,8 +211,23 @@ if __name__ == "__main__":
     sched.schedule(datetime.now() + timedelta(seconds=1), heartbeat, sched)
     sched.schedule(datetime.now() + timedelta(seconds=2), web_scrape, sched)
 
+    # Schedule bin indicator illumination
+    log_stuff("[Main] Bin indicator on for 4pm")
+    sched.schedule(next_schedule_time(16), show_bin_indicator, sched)
+    log_stuff("[Main] Bin indicator off at 11pm")
+    sched.schedule(next_schedule_time(16), hide_bin_indicator, sched)
+
+    # button listener
+    # Set up event detection for both edges
+    GPIO.add_event_detect(BUTTON_PIN, GPIO.RISING, bouncetime=10)
+
+    GPIO.add_event_callback(BUTTON_PIN, lambda ch: button_pressed(ch))
+
     try:
         sched.run()
     except KeyboardInterrupt:
         sched.stop()
+        r.stop()
+        g.stop()
+        b.stop()
         GPIO.cleanup()
