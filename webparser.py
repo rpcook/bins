@@ -64,7 +64,8 @@ def parse_dates(bin_dictionary):
     bin_dates = {}
     for bin in bin_dictionary:
         # print(bin_dictionary[bin])
-        bin_date = int(datetime.strptime(re.sub(r'(\d{1,2})(st|nd|rd|th)', r'\1', bin_dictionary[bin]), "%A %d %B %Y").timestamp()/86400)
+        # bin_date = int(datetime.strptime(re.sub(r'(\d{1,2})(st|nd|rd|th)', r'\1', bin_dictionary[bin]), "%A %d %B %Y").timestamp()/86400)
+        bin_date = datetime.strptime(re.sub(r'(\d{1,2})(st|nd|rd|th)', r'\1', bin_dictionary[bin]), "%A %d %B %Y").date()
         bin_dates[bin] = bin_date
     return bin_dates
 

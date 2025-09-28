@@ -205,10 +205,9 @@ def update_bin_indicator():
         log_stuff("[Bin] Updating indicator illumination")
         if len(date_information_int) == 0:
             return
-        today_int = int(datetime.now().timestamp()/86400)
+        today_int = datetime.now().date()
         for bin in bin_colours.keys():
-            if today_int + 1 == date_information_int[bin]:
-                # print(bin_colours[bin])
+           if (date_information_int[bin] - today_int).days == 1:
                 for i in range(3):
                     bin_indicator[i].ChangeDutyCycle(bin_colours[bin][i])
     else:
