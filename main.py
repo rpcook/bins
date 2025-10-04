@@ -104,7 +104,7 @@ class statusLEDManager:
             # log_stuff(f"[LED] Active: {top[1]} (priority {top[0]})")
             # here you would actually set the GPIO LED
             status_indicator[0].ChangeDutyCycle(0)
-            status_indicator[1].ChangeDutyCycle(90)
+            status_indicator[1].ChangeDutyCycle(95)
             status_indicator[2].ChangeDutyCycle(0)
             time.sleep(0.05)
             status_indicator[0].ChangeDutyCycle(0)
