@@ -1,9 +1,27 @@
+import sys
+import time
+import threading
+
 class MockPWM:
+    _instances = []
+    _lock = threading.Lock()
+
     def __init__(self, pin, frequency):
+        print(f"[MockGPIO] Creating PWM on pin {pin} at {frequency}Hz")
         self.pin = pin
         self.frequency = frequency
         self.duty_cycle = 0
         self.running = False
+
+        # Register this instance
+        with MockPWM._lock:
+            MockPWM._instances.append(self)
+
+        # Start background thread to show bars
+        if not hasattr(MockPWM, "_display_thread"):
+            MockPWM._stop_display = False
+            MockPWM._display_thread = threading.Thread(target=self._display_loop, daemon=True)
+            MockPWM._display_thread.start()
 
     def start(self, duty_cycle):
         self.duty_cycle = duty_cycle
@@ -14,7 +32,7 @@ class MockPWM:
         if not self.running:
             print("[MockPWM] Warning: PWM not started yet")
         self.duty_cycle = duty_cycle
-        print(f"[MockPWM] Changed duty cycle on pin {self.pin} to {self.duty_cycle}%")
+        # print(f"[MockPWM] Changed duty cycle on pin {self.pin} to {self.duty_cycle}%")
 
     def ChangeFrequency(self, frequency):
         if not self.running:
@@ -26,6 +44,27 @@ class MockPWM:
         self.running = False
         print(f"[MockPWM] Stopped PWM on pin {self.pin}")
 
+    @classmethod
+    def _display_loop(cls):
+        """ Continuously updates the console with all PWM bars on one line. """
+        while not getattr(cls, "_stop_display", False):
+            with cls._lock:
+                bars = []
+                for pwm in cls._instances:
+                    val = pwm.duty_cycle if pwm.running else 0
+                    filled = int(val / 5)  # 20 chars wide (0–100%)
+                    bar = "#" * filled + "-" * (20 - filled)
+                    bars.append(f"Pin {pwm.pin:2d} [{bar}] {val:3.0f}%")
+                sys.stdout.write("\r" + " | ".join(bars) + " " * 10)
+                sys.stdout.flush()
+            time.sleep(0.1)
+
+    @classmethod
+    def shutdown_display(cls):
+        """ Stop background thread (optional). """
+        cls._stop_display = True
+        if hasattr(cls, "_display_thread"):
+            cls._display_thread.join(timeout=1)
 
 class MockGPIO:
     BOARD = "BOARD"
@@ -63,7 +102,6 @@ class MockGPIO:
         return state
 
     def PWM(self, pin, frequency):
-        print(f"[MockGPIO] Creating PWM on pin {pin} at {frequency}Hz")
         return MockPWM(pin, frequency)
     
     def add_event_detect(self, pin, edge, bouncetime):
