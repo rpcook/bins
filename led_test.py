@@ -1,111 +1,201 @@
-import heapq
+# import heapq
 import threading
 import time
 
-class LEDController:
-    def __init__(self, update_func):
-        self.update_func = update_func  # function to set PWM outputs
-        self.jobs = []                  # heap: [(-priority, job_id, fn)]
-        self.cancelled = set()          # set of cancelled job_ids
-        self.job_id = 0
-        self.lock = threading.Lock()
-        self.running = True
-        self.worker = threading.Thread(target=self._run, daemon=True)
-        self.worker.start()
+# ---- GPIO library with mock for PC development ----
+try:
+    import RPi.GPIO as GPIO
+except ImportError:
+    from MockGPIO import MockGPIO
+    GPIO = MockGPIO()
 
-    def add_job(self, priority, fn):
-        """Add a new LED job with priority and update function. Returns job_id."""
+class LEDController:
+    def __init__(self, pwm_channels, inverted=False, update_rate=0.05):
+        """
+        pwm_channels: tuple/list of 3 PWM objects (R, G, B)
+        inverted: bool or tuple/list of bools (one per channel)
+        update_rate: seconds between pattern updates
+        """
+        if not isinstance(pwm_channels, (tuple, list)) or len(pwm_channels) != 3:
+            raise ValueError("pwm_channels must be a tuple/list of 3 PWM objects (R, G, B)")
+
+        self.pwm_channels = pwm_channels
+
+        if isinstance(inverted, (tuple, list)):
+            if len(inverted) != 3:
+                raise ValueError("inverted tuple must have 3 elements (for R,G,B)")
+            self.inverted = inverted
+        else:
+            self.inverted = (inverted, inverted, inverted)
+
+        self.update_rate = update_rate
+        self.lock = threading.Lock()
+        self.jobs = {}  # {job_id: (priority, generator)}
+        self.active = True
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    # -----------------------------
+    # LED hardware interface
+    # -----------------------------
+    def _apply_rgb(self, r, g, b):
+        """Directly set RGB LED brightness values (0–100)."""
+        channels = [r, g, b]
+        for i, pwm in enumerate(self.pwm_channels):
+            duty = 100 - channels[i] if self.inverted[i] else channels[i]
+            pwm.ChangeDutyCycle(duty)
+
+    # -----------------------------
+    # Job control
+    # -----------------------------
+    def push_job(self, job_id, priority, generator_func):
+        """
+        Add or replace a job.
+        generator_func must be a generator function that yields repeatedly.
+        """
         with self.lock:
-            self.job_id += 1
-            job_id = self.job_id
-            heapq.heappush(self.jobs, (-priority, job_id, fn))
-            return job_id
+            self.jobs[job_id] = (priority, generator_func(self))
+            # sort jobs implicitly by priority when choosing active job
 
     def remove_job(self, job_id):
-        """Mark a job as cancelled (will be skipped when encountered)."""
+        """Remove a job by its ID."""
         with self.lock:
-            self.cancelled.add(job_id)
+            if job_id in self.jobs:
+                del self.jobs[job_id]
 
-    def remove_top(self):
-        """Convenience: cancel the current top job."""
+    def clear_jobs(self):
         with self.lock:
-            if self.jobs:
-                _, job_id, _ = self.jobs[0]
-                self.cancelled.add(job_id)
+            self.jobs.clear()
 
-    def _get_next_job(self):
-        """Return the highest priority non-cancelled job, or None."""
-        while self.jobs:
-            priority, job_id, fn = self.jobs[0]
-            if job_id in self.cancelled:
-                # discard cancelled jobs
-                heapq.heappop(self.jobs)
-                self.cancelled.remove(job_id)
-                continue
-            return fn
-        return None
-
+    # -----------------------------
+    # Main loop
+    # -----------------------------
     def _run(self):
-        while self.running:
-            fn = None
+        """Main LED control loop."""
+        while self.active:
             with self.lock:
-                fn = self._get_next_job()
+                if not self.jobs:
+                    job = None
+                else:
+                    # get highest-priority job
+                    job = max(self.jobs.items(), key=lambda kv: kv[1][0])[1][1]
 
-            if fn:
-                fn(self.update_func)  # run pattern
+            if job:
+                try:
+                    next(job)  # advance one step
+                except StopIteration:
+                    # finished pattern; remove automatically
+                    with self.lock:
+                        for jid, (_, gen) in list(self.jobs.items()):
+                            if gen is job:
+                                del self.jobs[jid]
+                                break
+                except Exception as e:
+                    print(f"[LEDController] Job error: {e}")
             else:
-                time.sleep(0.1)       # idle wait
+                time.sleep(self.update_rate)
+        print("LED controller stopped")
 
     def stop(self):
-        self.running = False
-        self.worker.join()
-
+        self.active = False
+        self.thread.join()
 # ---------------------------
 # Example LED job functions
 # ---------------------------
 
-def solid_green(update_func):
-    update_func(0, 100, 0)
-    time.sleep(0.5)
+# def solid_green(update_func):
+#     update_func(0, 100, 0)
+#     time.sleep(0.5)
 
-def solid_red(update_func):
-    update_func(100, 0, 0)
-    time.sleep(0.5)
+# def solid_red(update_func):
+#     update_func(100, 0, 0)
+#     time.sleep(0.5)
 
-def pulse_green(update_func):
-    for i in range(0, 101, 10):
-        update_func(0, i, 0)
-        time.sleep(0.05)
-    for i in range(100, -1, -10):
-        update_func(0, i, 0)
-        time.sleep(0.05)
+# def pulse_green(update_func):
+#     for i in range(0, 101, 10):
+#         update_func(0, i, 0)
+#         time.sleep(0.05)
+#     for i in range(100, -1, -10):
+#         update_func(0, i, 0)
+#         time.sleep(0.05)
 
 # ---------------------------
 # Example usage
 # ---------------------------
 
-def dummy_update(r, g, b):
-    print(f"LED -> R:{r} G:{g} B:{b}")
+# def dummy_update(r, g, b):
+#     print(f"LED -> R:{r} G:{g} B:{b}")
+
+# def update_pwm_values(r, g, b):
+#     pass
+def solid_red(led):
+    """Static red light (runs until replaced or removed)."""
+    while True:
+        led._apply_rgb(100, 0, 0)
+        yield  # yield control back to controller
+
+def pulse_green(led):
+    """Smoothly pulse green."""
+    brightness = 0
+    direction = 5
+    while True:
+        led._apply_rgb(0, brightness, 0)
+        brightness += direction
+        if brightness >= 100 or brightness <= 0:
+            direction *= -1
+        time.sleep(0.02)
+        yield  # yield every small step
+
+def flash_blue(led):
+    """Quick flash sequence."""
+    for _ in range(4):
+        led._apply_rgb(0, 0, 100)
+        time.sleep(0.1)
+        yield
+        led._apply_rgb(0, 0, 0)
+        time.sleep(0.1)
+        yield
+    # stop automatically after a few flashes
+def printJunk():
+    for i in range(5):
+        print(f"[TEST] number {i}")
 
 if __name__ == "__main__":
-    led = LEDController(dummy_update)
+    GPIO.setmode(GPIO.BCM)
 
-    # Add jobs
-    j1 = led.add_job(1, solid_green)
-    time.sleep(1)
-    j2 = led.add_job(2, solid_red)  # higher priority overrides
-    time.sleep(1)
+    STATUS_RED = 21
+    STATUS_GREEN_BAR = 18
+    STATUS_BLUE = 11
+    BIN_RED = 10
+    BIN_GREEN = 9
+    BIN_BLUE = 17
 
-    # green pulse job
-    j3 = led.add_job(4, pulse_green)
+    pins = (STATUS_RED, STATUS_GREEN_BAR, STATUS_BLUE)
+    pwms = []
+    for p in pins:
+        GPIO.setup(p, GPIO.OUT)
+        pwm = GPIO.PWM(p, 200)
+        pwm.start(0)
+        pwms.append(pwm)
+
+    status_led = LEDController(tuple(pwms), [False, True, False])
+
+    pins = (BIN_RED, BIN_GREEN, BIN_BLUE)
+    pwms = []
+    for p in pins:
+        GPIO.setup(p, GPIO.OUT)
+        pwm = GPIO.PWM(p, 200)
+        pwm.start(0)
+        pwms.append(pwm)
+
+    bin_led = LEDController(tuple(pwms))
+
+    # --- Control sequence ---
+    status_led.push_job("heartbeat", 1, pulse_green)
+    # printJunk()
     time.sleep(2)
-
-    # Remove red job (falls back to green)
-    led.remove_job(j3)
-    time.sleep(2)
-
-    # Add green pulse job, then cancel before it shows
-    led.remove_job(j2)  # prevent fallback to this
-    time.sleep(2)
-
-    led.stop()
+    status_led.push_job("alert", 10, flash_blue)  # temporarily override
+    # printJunk()
+    time.sleep(3)
+    status_led.remove_job("alert")  # goes back to heartbeat
+    # printJunk()
