@@ -3,26 +3,12 @@ import time
 import threading
 
 class MockPWM:
-    # _instances = []
-    # _lock = threading.Lock()
-
     def __init__(self, pin, frequency, display=None):
         print(f"[MockGPIO] Creating PWM on pin {pin} at {frequency}Hz")
         self.pin = pin
         self.frequency = frequency
         self.duty_cycle = 0
         self.display = display
-        # self.running = False
-
-        # # Register this instance
-        # with MockPWM._lock:
-        #     MockPWM._instances.append(self)
-
-        # # Start background thread to show bars
-        # if not hasattr(MockPWM, "_display_thread"):
-        #     MockPWM._stop_display = False
-        #     MockPWM._display_thread = threading.Thread(target=self._display_loop, daemon=True)
-        #     MockPWM._display_thread.start()
 
     def start(self, duty_cycle):
         self.duty_cycle = duty_cycle
@@ -55,47 +41,17 @@ class MockPWM:
                                  10: 1, 9:  1, 17: 1}
         
         current = list(self.display.rgb_values[gpio_pin_to_led_index[self.pin]])
+
+        # get current LED colour index
         gpio_pin_to_led_colour_index = {21: 0, 18: 1, 11: 2,
                                         10: 0, 9:  1, 17: 2}
-        current[gpio_pin_to_led_colour_index[self.pin]] = self.duty_cycle
+        if self.pin == 18:
+            # hardcoded hack to invert the status green channel
+            current[gpio_pin_to_led_colour_index[self.pin]] = 100 - self.duty_cycle
+        else:
+            current[gpio_pin_to_led_colour_index[self.pin]] = self.duty_cycle
+
         self.display.update_led(gpio_pin_to_led_index[self.pin], tuple(current))
-   
-    # --- Helper for colours ---
-    # @staticmethod
-    # def _get_colour_code(pin):
-        # """Return an ANSI colour based on pin number."""
-        # colours = {21: "\033[31m", 18: "\033[32m", 11: "\033[34m",
-        #            10: "\033[31m", 9: "\033[32m", 17: "\033[34m"}
-        # return colours.get(pin, "\033[90m")  # Grey default
-
-    # @classmethod
-    # def _display_loop(cls):
-    #     """ Continuously updates the console with all PWM bars on one line. """
-    #     while not getattr(cls, "_stop_display", False):
-    #         with cls._lock:
-    #             bars = []
-    #             for pwm in cls._instances:
-    #                 val = pwm.duty_cycle if pwm.running else 0
-    #                 filled = int(val / 10)  # 20 chars = 0–100%
-    #                 bar = "#" * filled + "-" * (10 - filled)
-
-    #                 color = cls._get_colour_code(pwm.pin)
-    #                 reset = "\033[0m"
-    #                 bars.append(f"{color}Pin {pwm.pin:>2} [{bar}] {val:3.0f}%{reset}")
-
-    #             sys.stdout.write("\r" + " | ".join(bars) + " " * 10)
-    #             sys.stdout.flush()
-    #         time.sleep(0.1)
-
-    # @classmethod
-    # def shutdown_display(cls):
-        # """ Stop background thread (optional). """
-        # cls._stop_display = True
-        # if hasattr(cls, "_display_thread"):
-        #     cls._display_thread.join(timeout=1)
-        # # Reset terminal colours and move to new line
-        # sys.stdout.write("\033[0m\n")
-        # sys.stdout.flush()
 
 class MockGPIO:
     BOARD = "BOARD"
@@ -169,7 +125,6 @@ class LEDBarDisplay:
         sys.stdout.flush()
         while not self._stop.is_set():
             # Save cursor position
-            # sys.stdout.write(f"\033[{num_lines}F")  # Move cursor up num_lines
             sys.stdout.write("\033[?25l")           # Hide cursor
 
             # Draw header

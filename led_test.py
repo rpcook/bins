@@ -27,7 +27,7 @@ class LEDController:
             self.inverted = inverted
         else:
             self.inverted = (inverted, inverted, inverted)
-
+        
         self.update_rate = update_rate
         self.lock = threading.Lock()
         self.jobs = {}  # {job_id: (priority, generator)}
@@ -99,35 +99,11 @@ class LEDController:
     def stop(self):
         self.active = False
         self.thread.join()
-# ---------------------------
-# Example LED job functions
-# ---------------------------
-
-# def solid_green(update_func):
-#     update_func(0, 100, 0)
-#     time.sleep(0.5)
-
-# def solid_red(update_func):
-#     update_func(100, 0, 0)
-#     time.sleep(0.5)
-
-# def pulse_green(update_func):
-#     for i in range(0, 101, 10):
-#         update_func(0, i, 0)
-#         time.sleep(0.05)
-#     for i in range(100, -1, -10):
-#         update_func(0, i, 0)
-#         time.sleep(0.05)
 
 # ---------------------------
-# Example usage
+# LED job functions
 # ---------------------------
 
-# def dummy_update(r, g, b):
-#     print(f"LED -> R:{r} G:{g} B:{b}")
-
-# def update_pwm_values(r, g, b):
-#     pass
 def solid_red(led):
     """Static red light (runs until replaced or removed)."""
     while True:
@@ -156,9 +132,6 @@ def flash_blue(led):
         time.sleep(0.1)
         yield
     # stop automatically after a few flashes
-def printJunk():
-    for i in range(5):
-        print(f"[TEST] number {i}")
 
 if __name__ == "__main__":
     GPIO.setmode(GPIO.BCM)
@@ -191,11 +164,12 @@ if __name__ == "__main__":
     bin_led = LEDController(tuple(pwms))
 
     # --- Control sequence ---
+    status_led.push_job("error", 2, solid_red)
+    time.sleep(2)
+    status_led.remove_job("error")
     status_led.push_job("heartbeat", 1, pulse_green)
-    # printJunk()
     time.sleep(2)
     status_led.push_job("alert", 10, flash_blue)  # temporarily override
-    # printJunk()
-    time.sleep(3)
+    time.sleep(2)
     status_led.remove_job("alert")  # goes back to heartbeat
-    # printJunk()
+    print("\033[2B") # move cursor to bottom
