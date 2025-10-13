@@ -169,12 +169,12 @@ class LEDBarDisplay:
         sys.stdout.flush()
         while not self._stop.is_set():
             # Save cursor position
-            sys.stdout.write(f"\033[{num_lines}F")  # Move cursor up num_lines
+            # sys.stdout.write(f"\033[{num_lines}F")  # Move cursor up num_lines
             sys.stdout.write("\033[?25l")           # Hide cursor
 
             # Draw header
             sys.stdout.write("\033[2K")  # clear line
-            sys.stdout.write("=== LED STATUS ===\n")
+            sys.stdout.write("= LED STATUS =\n")
 
             for i, (r, g, b) in enumerate(self.rgb_values):
                 def colour_bar(value, colour_code):
@@ -190,6 +190,7 @@ class LEDBarDisplay:
 
             sys.stdout.flush()
             sys.stdout.write("\033[?25h")           # show cursor again
+            sys.stdout.write(f"\033[{num_lines}F")  # Move cursor up num_lines
             time.sleep(self.refresh_rate)
 
     def stop(self):
