@@ -14,6 +14,7 @@ except ImportError:
 # ---------------- Custom Packages -------------------
 import scraper
 import webparser
+from LEDcontroller import LEDcontroller
 
 # ------------- Configuration variables --------------
 # TODO: read these in from config file
