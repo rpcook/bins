@@ -67,7 +67,7 @@ class MockGPIO:
     def __init__(self):
         self.mode = None
         self.pins = {}
-        self.display = LEDBarDisplay(refresh_rate=0.05)
+        self.display = LEDBarDisplay(refresh_rate=0.2)
 
     def setmode(self, mode):
         self.mode = mode

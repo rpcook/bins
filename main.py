@@ -15,6 +15,8 @@ except ImportError:
 import scraper
 import webparser
 from LEDcontroller import LEDcontroller
+from LEDcontroller import solid_red
+import LEDpatterns
 
 # ------------- Configuration variables --------------
 # TODO: read these in from config file
@@ -36,104 +38,6 @@ if datetime.now().hour >= start_bin_schedule and datetime.now().hour < stop_bin_
 else:
     bin_schedule_state = False
 
-# --------------- Configure GPIO -------------------
-GPIO.setmode(GPIO.BCM) # BCM numbering
-
-# physical pin assignments
-BUTTON_PIN = 5
-STATUS_RED = 21
-STATUS_GREEN_BAR = 18
-STATUS_BLUE = 11
-BIN_RED = 10
-BIN_GREEN = 9
-BIN_BLUE = 17
-
-pins = (STATUS_RED, STATUS_GREEN_BAR, STATUS_BLUE)
-pwms = []
-for p in pins:
-    GPIO.setup(p, GPIO.OUT)
-    pwm = GPIO.PWM(p, 200)
-    pwm.start(0)
-    pwms.append(pwm)
-
-status_led = LEDcontroller(tuple(pwms), [False, True, False])
-
-pins = (BIN_RED, BIN_GREEN, BIN_BLUE)
-pwms = []
-for p in pins:
-    GPIO.setup(p, GPIO.OUT)
-    pwm = GPIO.PWM(p, 200)
-    pwm.start(0)
-    pwms.append(pwm)
-
-bin_led = LEDcontroller(tuple(pwms))
-
-# # configure pin directions
-# GPIO.setup(BUTTON_PIN, GPIO.IN)
-# GPIO.setup(STATUS_RED, GPIO.OUT)
-# GPIO.setup(STATUS_GREEN_BAR, GPIO.OUT)
-# GPIO.setup(STATUS_BLUE, GPIO.OUT)
-# GPIO.setup(BIN_RED, GPIO.OUT)
-# GPIO.setup(BIN_GREEN, GPIO.OUT)
-# GPIO.setup(BIN_BLUE, GPIO.OUT)
-
-# # configure pwm pins
-# status_r = GPIO.PWM(STATUS_RED, 200)
-# status_g = GPIO.PWM(STATUS_GREEN_BAR, 200)
-# status_b = GPIO.PWM(STATUS_BLUE, 200)
-# bin_r = GPIO.PWM(BIN_RED, 200)
-# bin_g = GPIO.PWM(BIN_GREEN, 200)
-# bin_b = GPIO.PWM(BIN_BLUE, 200)
-# status_r.start(0)
-# status_g.start(100)
-# status_b.start(0)
-# bin_r.start(0)
-# bin_g.start(0)
-# bin_b.start(0)
-
-# tuple for led controls
-# status_indicator = (status_r, status_g, status_b)
-# bin_indicator = (bin_r, bin_g, bin_b)
-
-# ---------------- Status LED Manager ----------------
-# class statusLEDManager:
-#     def __init__(self):
-#         self.stack = []  # (priority, message)
-#         self.lock = threading.Lock()
-
-#     def push(self, priority, message):
-#         with self.lock:
-#             if not self.stack or priority >= self.stack[-1][0]:
-#                 # log_stuff(f"[LED] Pushed {message} (priority {priority})")
-#                 self.stack.append((priority, message))
-#                 self._update_led()
-#             else:
-#                 log_stuff(f"[LED] Ignored {message} (priority {priority}) < current {self.stack[-1]}")
-
-#     def pop(self, message):
-#         with self.lock:
-#             for i in range(len(self.stack) - 1, -1, -1):
-#                 if self.stack[i][1] == message:
-#                     removed = self.stack.pop(i)
-#                     # log_stuff(f"[LED] Popped {removed}")
-#                     break
-#             self._update_led()
-
-#     def _update_led(self):
-#         if self.stack:
-#             top = self.stack[-1]
-#             # log_stuff(f"[LED] Active: {top[1]} (priority {top[0]})")
-#             # here you would actually set the GPIO LED
-#             status_indicator[0].ChangeDutyCycle(0)
-#             status_indicator[1].ChangeDutyCycle(95)
-#             status_indicator[2].ChangeDutyCycle(0)
-#             time.sleep(0.05)
-#             status_indicator[0].ChangeDutyCycle(0)
-#             status_indicator[1].ChangeDutyCycle(100)
-#             status_indicator[2].ChangeDutyCycle(0)
-#         else:
-#             # log_stuff("[LED] Off")
-#             pass
 
 # ---------------- Scheduler ----------------
 class Scheduler:
@@ -174,10 +78,12 @@ def log_stuff(message):
 
 # -------------- Event Jobs ----------------
 def heartbeat(sched):
-    # sched.statusLED.push(1, "Heartbeat")
+    sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.solid_colour(led, [0,100,0]))
     # log_stuff("[LED] Heartbeat blink")
     time.sleep(0.2)
-    # sched.statusLED.pop("Heartbeat")
+    time.sleep(1.8)
+    # sched.statusLED.remove_job("heartbeat")
+    sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.solid_colour(led, [0,0,0]))
     # reschedule itself
     sched.schedule(datetime.now() + timedelta(seconds=10), heartbeat, sched)
 
@@ -259,7 +165,37 @@ def check_scheduler(sched):
 
 # ---------------- Main ----------------
 if __name__ == "__main__":
-    # statusLED = statusLEDManager()
+    # --------------- Configure GPIO -------------------
+    GPIO.setmode(GPIO.BCM) # BCM numbering
+
+    # physical pin assignments
+    BUTTON_PIN = 5
+    STATUS_RED = 21
+    STATUS_GREEN_BAR = 18
+    STATUS_BLUE = 11
+    BIN_RED = 10
+    BIN_GREEN = 9
+    BIN_BLUE = 17
+
+    pins = (STATUS_RED, STATUS_GREEN_BAR, STATUS_BLUE)
+    pwms = []
+    for p in pins:
+        GPIO.setup(p, GPIO.OUT)
+        pwm = GPIO.PWM(p, 200)
+        pwm.start(0)
+        pwms.append(pwm)
+
+    status_led = LEDcontroller(tuple(pwms), [False, True, False])
+
+    pins = (BIN_RED, BIN_GREEN, BIN_BLUE)
+    pwms = []
+    for p in pins:
+        GPIO.setup(p, GPIO.OUT)
+        pwm = GPIO.PWM(p, 200)
+        pwm.start(0)
+        pwms.append(pwm)
+
+    bin_led = LEDcontroller(tuple(pwms))
 
     sched = Scheduler(status_led, bin_led)
 
