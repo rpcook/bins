@@ -129,7 +129,7 @@ def flash_blue(led):
 if __name__ == "__main__":
 # ---- GPIO library with mock for PC development ----
     try:
-        import RPi.GPIO as GPIO
+        import RPi.GPIO as GPIO # type: ignore
     except ImportError:
         from MockGPIO import MockGPIO
         GPIO = MockGPIO()
