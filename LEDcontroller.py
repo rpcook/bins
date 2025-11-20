@@ -2,13 +2,6 @@
 import threading
 import time
 
-# ---- GPIO library with mock for PC development ----
-try:
-    import RPi.GPIO as GPIO
-except ImportError:
-    from MockGPIO import MockGPIO
-    GPIO = MockGPIO()
-
 class LEDcontroller:
     def __init__(self, pwm_channels, inverted=False, update_rate=0.05):
         """
@@ -134,6 +127,12 @@ def flash_blue(led):
     # stop automatically after a few flashes
 
 if __name__ == "__main__":
+# ---- GPIO library with mock for PC development ----
+    try:
+        import RPi.GPIO as GPIO
+    except ImportError:
+        from MockGPIO import MockGPIO
+        GPIO = MockGPIO()
     GPIO.setmode(GPIO.BCM)
 
     STATUS_RED = 21
