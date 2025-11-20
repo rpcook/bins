@@ -15,7 +15,6 @@ except ImportError:
 import scraper
 import webparser
 from LEDcontroller import LEDcontroller
-from LEDcontroller import solid_red
 import LEDpatterns
 
 # ------------- Configuration variables --------------
@@ -37,7 +36,6 @@ if datetime.now().hour >= start_bin_schedule and datetime.now().hour < stop_bin_
     bin_schedule_state = True
 else:
     bin_schedule_state = False
-
 
 # ---------------- Scheduler ----------------
 class Scheduler:
@@ -78,12 +76,9 @@ def log_stuff(message):
 
 # -------------- Event Jobs ----------------
 def heartbeat(sched):
-    sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.solid_colour(led, [0,100,0]))
-    # log_stuff("[LED] Heartbeat blink")
-    time.sleep(0.2)
-    time.sleep(1.8)
-    # sched.statusLED.remove_job("heartbeat")
-    sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.solid_colour(led, [0,0,0]))
+    sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.heartbeat(led))
+    time.sleep(1)
+    sched.statusLED.remove_job("heartbeat")
     # reschedule itself
     sched.schedule(datetime.now() + timedelta(seconds=10), heartbeat, sched)
 

@@ -5,3 +5,16 @@ def solid_colour(led, RGB):
         led._apply_rgb(RGB[0], RGB[1], RGB[2])
         time.sleep(0.1)
         yield
+
+def turn_off(led):
+    while True:
+        led._apply_rgb(0, 0, 0)
+        time.sleep(0.1)
+        yield
+
+def heartbeat(led):
+    led._apply_rgb(0,30,0)
+    for i in range(2):
+        time.sleep(0.1)
+        yield
+    led._apply_rgb(0,0,0)
