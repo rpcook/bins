@@ -13,8 +13,8 @@ def turn_off(led):
         yield
 
 def heartbeat(led):
-    led._apply_rgb(0,30,0)
+    led._apply_rgb(0,4,0)
     for i in range(2):
-        time.sleep(0.1)
+        time.sleep(0.05)
         yield
     led._apply_rgb(0,0,0)

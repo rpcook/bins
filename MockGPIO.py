@@ -1,6 +1,7 @@
 import sys
 import time
 import threading
+import math
 
 class MockPWM:
     def __init__(self, pin, frequency, display=None):
@@ -133,7 +134,7 @@ class LEDBarDisplay:
 
             for i, (r, g, b) in enumerate(self.rgb_values):
                 def colour_bar(value, colour_code):
-                    bar = "█" * int(value / 5)
+                    bar = "█" * int(math.ceil(value / 5))
                     return f"\033[{colour_code}m{bar:<20}\033[0m"
 
                 bar_r = colour_bar(r, 31)  # Red

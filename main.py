@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 # ---- GPIO library with mock for PC development ----
 try:
-    import RPi.GPIO as GPIO
+    import RPi.GPIO as GPIO # type: ignore
 except ImportError:
     from MockGPIO import MockGPIO
     GPIO = MockGPIO()
@@ -144,14 +144,12 @@ def update_bin_indicator():
         if len(date_information_int) == 0:
             return
         today_int = datetime.now().date()
-        # for bin in bin_colours.keys():
-        #    if (date_information_int[bin] - today_int).days == 1:
-        #         for i in range(3):
-        #             bin_indicator[i].ChangeDutyCycle(bin_colours[bin][i])
+        for bin in bin_colours.keys():
+            if (date_information_int[bin] - today_int).days == 1:
+                sched.binLED.push_job("nextBin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[bin]))
     else:
         log_stuff("[Bin] Turning off bin indicator")
-        # for LED_channel in bin_indicator:
-        #     LED_channel.ChangeDutyCycle(0)
+        sched.binLED.remove_job("nextBin")
 
 def check_scheduler(sched):
     # debug check
@@ -205,6 +203,9 @@ if __name__ == "__main__":
     log_stuff("[Main] Bin indicator off at 11pm")
     sched.schedule(next_schedule_time(stop_bin_schedule), hide_bin_indicator, sched)
 
+    # set default bin illumination (off)
+    sched.binLED.push_job("defaultOff", 1, lambda led: LEDpatterns.turn_off(led))
+
     # button listener
     # Set up event detection for rising edge
     GPIO.add_event_detect(BUTTON_PIN, GPIO.RISING, bouncetime=10)
@@ -214,10 +215,4 @@ if __name__ == "__main__":
         sched.run()
     except KeyboardInterrupt:
         sched.stop()
-        # status_r.stop()
-        # status_g.stop()
-        # status_b.stop()
-        # bin_r.stop()
-        # bin_g.stop()
-        # bin_b.stop()
         GPIO.cleanup()
