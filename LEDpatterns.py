@@ -26,3 +26,13 @@ def web_activity(led):
         led._apply_rgb(0,0,0)
         time.sleep(0.05)
         yield
+
+def success(led):
+    for i in range(3):
+        led._apply_rgb(0,30,0)
+        time.sleep(0.5)
+        yield
+        led._apply_rgb(0,0,0)
+        time.sleep(0.5)
+        yield
+    led.remove_job("success")    

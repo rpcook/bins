@@ -92,6 +92,7 @@ def web_scrape(sched):
         date_information_dict = webparser.parse_bin_table_to_dict(source)
         date_information_int = webparser.parse_dates(date_information_dict)
         log_stuff("[Scraper] Successfully finished web scrape.")
+        sched.statusLED.push_job("success", 20, lambda led: LEDpatterns.success(led))
         # reschedule scraping for 12pm
         log_stuff("[Scraper] Rescheduling for 12pm")
         sched.schedule(next_schedule_time(web_scrape_schedule), web_scrape, sched)
