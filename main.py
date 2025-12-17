@@ -170,6 +170,10 @@ if __name__ == "__main__":
     BIN_GREEN = 9
     BIN_BLUE = 17
 
+    # button pin configuration
+    GPIO.setup(BUTTON_PIN, GPIO.IN)
+    
+    # status LED configuration
     pins = (STATUS_RED, STATUS_GREEN_BAR, STATUS_BLUE)
     pwms = []
     for p in pins:
@@ -180,6 +184,7 @@ if __name__ == "__main__":
 
     status_led = LEDcontroller(tuple(pwms), [False, True, False])
 
+    # bin LED configuration
     pins = (BIN_RED, BIN_GREEN, BIN_BLUE)
     pwms = []
     for p in pins:
