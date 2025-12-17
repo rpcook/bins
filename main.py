@@ -161,7 +161,7 @@ def heartbeat(sched):
 
 def web_scrape(sched):
     global date_information_int
-    sched.statusLED.push(5, "Web scrape running")
+    sched.statusLED.push_job("web_scrape", 10, lambda led: LEDpatterns.web_activity(led))
     log_stuff("[Scraper] Starting web scrape...")
     try:
         with open("address.txt") as f:
@@ -177,7 +177,7 @@ def web_scrape(sched):
         # reschedule for 10 minutes time
         log_stuff("[Scraper] Rescheduling for 10 minutes time")
         sched.schedule(datetime.now() + timedelta(minutes=10), web_scrape, sched)
-    sched.statusLED.pop("Web scrape running")
+    sched.statusLED.remove_job("web_scrape")
 
 def show_bin_indicator(sched):
     global bin_schedule_state, bin_display_state
