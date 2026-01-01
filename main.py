@@ -29,7 +29,7 @@ bin_colours = {
     "purple" : (100,  0,100)
     }
 
-# ---------------- Global variables ----------------
+# ----------------- Global variables ------------------
 date_information_int = []
 bin_display_state = True
 if datetime.now().hour >= start_bin_schedule and datetime.now().hour < stop_bin_schedule:
@@ -37,7 +37,59 @@ if datetime.now().hour >= start_bin_schedule and datetime.now().hour < stop_bin_
 else:
     bin_schedule_state = False
 
-# ---------------- Scheduler ----------------
+# --------- User input control variables --------------
+DOUBLE_TAP_TIME = 0.3   # seconds
+LONG_HOLD_TIME = 0.5    # seconds
+last_press_time = 0
+press_start_time = 0
+single_timer = None
+
+# --------- User input control functions --------------
+
+def button_pressed():
+    global last_press_time, press_start_time, single_timer
+    press_time = time.monotonic()
+    delta = press_time - last_press_time
+
+    if delta < DOUBLE_TAP_TIME:
+        if single_timer:
+            single_timer.cancel()
+        handle_double()
+    else:
+        press_start_time = press_time
+        # schedule long-hold check
+        threading.Timer(LONG_HOLD_TIME, check_hold, [press_time]).start()
+        # schedule single-press detection unless another tap arrives
+        single_timer = threading.Timer(DOUBLE_TAP_TIME, handle_single)
+        single_timer.start()
+
+    last_press_time = press_time
+
+def button_released():
+    global press_start_time
+    press_start_time = 0
+    # if single_timer:
+    #     single_timer.cancel()
+
+def check_hold(start_time):
+    # if button still held after LONG_HOLD_TIME, it's a long hold
+    if GPIO.input(BUTTON_PIN) == GPIO.HIGH and press_start_time == start_time:
+        # if single_timer:
+        #     single_timer.cancel()
+        handle_long()
+
+def handle_single():
+    global bin_display_state
+    bin_display_state = not bin_display_state
+    update_bin_indicator()
+
+def handle_double():
+    log_stuff("Double tap: show next bin collection")
+
+def handle_long():
+    log_stuff("Long press: soft reset")
+
+# --------------------- Scheduler ---------------------
 class Scheduler:
     def __init__(self, status_led_controller, bindicator_led_controller):
         self.events = []
@@ -120,24 +172,17 @@ def hide_bin_indicator(sched):
     log_stuff("[Main] Bin indicator off at 11pm")
     sched.schedule(next_schedule_time(stop_bin_schedule), hide_bin_indicator, sched)
 
+# ------- Helper functions --------
 def POST(sched):
     # blink bin indicator, pretty rainbow and stuff
     pass
 
-# ------- Helper functions --------
 def next_schedule_time(hour):
     now = datetime.now()
     run_at = now.replace(hour=hour, minute=0, second=0)
     if run_at < now:
         run_at += timedelta(days=1)
     return run_at
-
-def button_pressed():
-    global bin_display_state
-    bin_display_state = not bin_display_state
-    log_stuff("button pressed")
-    update_bin_indicator()
-    log_stuff(str(bin_display_state))
 
 def update_bin_indicator():
     if bin_display_state and bin_schedule_state:
@@ -214,8 +259,13 @@ if __name__ == "__main__":
 
     # button listener
     # Set up event detection for rising edge
-    GPIO.add_event_detect(BUTTON_PIN, GPIO.RISING, bouncetime=10)
-    GPIO.add_event_callback(BUTTON_PIN, lambda ch: button_pressed())
+    GPIO.add_event_detect(BUTTON_PIN, GPIO.BOTH, bouncetime=10)
+    GPIO.add_event_callback(
+        BUTTON_PIN,
+        lambda: (
+            button_pressed() if GPIO.input(BUTTON_PIN) == GPIO.HIGH else button_released()
+        )
+    )
 
     try:
         sched.run()
