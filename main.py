@@ -37,56 +37,57 @@ if datetime.now().hour >= start_bin_schedule and datetime.now().hour < stop_bin_
 else:
     bin_schedule_state = False
 
-# --------- User input control variables --------------
-DOUBLE_TAP_TIME = 0.3   # seconds
-LONG_HOLD_TIME = 0.5    # seconds
-last_press_time = 0
-press_start_time = 0
-single_timer = None
-
 # --------- User input control functions --------------
+class button_handler:
+    def __init__(self, PIN, single_fun=None, double_fun=None, long_fun=None, DOUBLE_TAP_TIME=0.3, LONG_HOLD_TIME=0.5):
+        self.PIN = PIN
+        self.DOUBLE_TAP_TIME = DOUBLE_TAP_TIME
+        self.LONG_HOLD_TIME = LONG_HOLD_TIME
+        self.last_press_time = 0
+        self.press_time_start = 0
+        self.single_timer = None
+        self.single_handler = single_fun
+        self.double_handler = double_fun
+        self.long_handler = long_fun
 
-def button_pressed():
-    global last_press_time, press_start_time, single_timer
-    press_time = time.monotonic()
-    delta = press_time - last_press_time
+    def button_pressed(self):
+        press_time = time.monotonic()
+        delta = press_time - self.last_press_time
 
-    if delta < DOUBLE_TAP_TIME:
-        if single_timer:
-            single_timer.cancel()
-        handle_double()
-    else:
-        press_start_time = press_time
-        # schedule long-hold check
-        threading.Timer(LONG_HOLD_TIME, check_hold, [press_time]).start()
-        # schedule single-press detection unless another tap arrives
-        single_timer = threading.Timer(DOUBLE_TAP_TIME, handle_single)
-        single_timer.start()
+        if delta < self.DOUBLE_TAP_TIME:
+            if self.single_timer:
+                self.single_timer.cancel()
+            if self.double_handler:
+                self.double_handler()
+        else:
+            self.press_start_time = press_time
+            # schedule long-hold check
+            threading.Timer(self.LONG_HOLD_TIME, self.check_hold, [press_time]).start()
+            # schedule single-press detection unless another tap arrives
+            self.single_timer = threading.Timer(self.DOUBLE_TAP_TIME, self.single_handler)
+            if self.single_handler:
+                self.single_timer.start()
 
-    last_press_time = press_time
+        self.last_press_time = press_time
 
-def button_released():
-    global press_start_time
-    press_start_time = 0
-    # if single_timer:
-    #     single_timer.cancel()
+    def button_released(self):
+        self.press_start_time = 0
 
-def check_hold(start_time):
-    # if button still held after LONG_HOLD_TIME, it's a long hold
-    if GPIO.input(BUTTON_PIN) == GPIO.HIGH and press_start_time == start_time:
-        # if single_timer:
-        #     single_timer.cancel()
-        handle_long()
+    def check_hold(self, start_time):
+        # if button still held after LONG_HOLD_TIME, it's a long hold
+        if GPIO.input(self.PIN) == GPIO.HIGH and self.press_start_time == start_time:
+            if self.long_handler:
+                self.long_handler()
 
-def handle_single():
+def toggle_bin_display():
     global bin_display_state
     bin_display_state = not bin_display_state
     update_bin_indicator()
 
-def handle_double():
+def show_next_bin():
     log_stuff("Double tap: show next bin collection")
 
-def handle_long():
+def soft_reset():
     log_stuff("Long press: soft reset")
 
 # --------------------- Scheduler ---------------------
@@ -258,12 +259,16 @@ if __name__ == "__main__":
     sched.binLED.push_job("defaultOff", 1, lambda led: LEDpatterns.turn_off(led))
 
     # button listener
-    # Set up event detection for rising edge
+    # Set up event detection for rising / falling edges
     GPIO.add_event_detect(BUTTON_PIN, GPIO.BOTH, bouncetime=10)
+    touch_button_handler = button_handler(PIN=BUTTON_PIN,
+                                          single_fun=toggle_bin_display,
+                                          double_fun=show_next_bin,
+                                          long_fun=soft_reset)
     GPIO.add_event_callback(
         BUTTON_PIN,
         lambda: (
-            button_pressed() if GPIO.input(BUTTON_PIN) == GPIO.HIGH else button_released()
+            touch_button_handler.button_pressed() if GPIO.input(BUTTON_PIN) == GPIO.HIGH else touch_button_handler.button_released()
         )
     )
 
