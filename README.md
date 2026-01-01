@@ -30,15 +30,15 @@ Web scraper to determine next collection hosted on a Raspberry Pi. On the day be
   - Brass button
   - UV resin status LED window
 - Install electronics
-- Build bin model
+- ~~Build bin model~~
 - Install bin model
 - Error handling
 - Robust watchdog etc
-- Catch maintenance mode on website
+- ~~Catch maintenance mode on website~~
 - Logging
   - Management of log size
 - Rainbow POST for bin
-- Different flashing modes
+- ~~Different user inputs~~
 
 ## Open Source Project (HACS Waste Collection)
 - Modify scraper to run in HACS installation
