@@ -84,11 +84,17 @@ def toggle_bin_display():
     bin_display_state = not bin_display_state
     update_bin_indicator()
 
-def show_next_bin():
+def show_next_bin(sched):
     log_stuff("Double tap: show next bin collection")
+    sched.statusLED.push_job("next_bin", 50, lambda led: LEDpatterns.solid_colour(led, (0,0,100)))
+    time.sleep(1)
+    sched.statusLED.remove_job("next_bin")
 
-def soft_reset():
+def soft_reset(sched):
     log_stuff("Long press: soft reset")
+    sched.statusLED.push_job("soft_reset", 50, lambda led: LEDpatterns.solid_colour(led, (100,0,100)))
+    time.sleep(1)
+    sched.statusLED.remove_job("soft_reset")
 
 # --------------------- Scheduler ---------------------
 class Scheduler:
@@ -263,8 +269,8 @@ if __name__ == "__main__":
     GPIO.add_event_detect(BUTTON_PIN, GPIO.BOTH, bouncetime=10)
     touch_button_handler = button_handler(PIN=BUTTON_PIN,
                                           single_fun=toggle_bin_display,
-                                          double_fun=show_next_bin,
-                                          long_fun=soft_reset)
+                                          double_fun=lambda: show_next_bin(sched),
+                                          long_fun=lambda: soft_reset(sched))
     GPIO.add_event_callback(
         BUTTON_PIN,
         lambda: (
