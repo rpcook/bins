@@ -111,7 +111,7 @@ def show_next_bin(sched):
             next_bin_int = (date_information_int[bin] - today_int).days
             next_bin_key = bin
     # call next bin indicator function (solid for 1s, then flash according to number of days until collection)
-    sched.binLED.push_job("user_request_next_bin", 50, lambda led, next_bin_int: LEDpatterns.next_bin(led, bin_colours[next_bin_key], next_bin_int))
+    sched.binLED.push_job("user_request_next_bin", 50, lambda led: LEDpatterns.next_bin(led, bin_colours[next_bin_key], next_bin_int))
 
 def soft_reset(sched):
     log_stuff("Soft reset.")
