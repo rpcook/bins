@@ -64,17 +64,22 @@ class button_handler:
             if self.single_timer:
                 self.single_timer.cancel()
             if self.double_handler:
+                log_stuff("Double tap.")
                 self.double_handler()
         else:
             self.press_start_time = press_time
             # schedule long-hold check
             threading.Timer(self.LONG_HOLD_TIME, self.check_hold, [press_time]).start()
             # schedule single-press detection unless another tap arrives
-            self.single_timer = threading.Timer(self.DOUBLE_TAP_TIME, self.single_handler)
+            self.single_timer = threading.Timer(self.DOUBLE_TAP_TIME, self.single_hander_wrapper)
             if self.single_handler:
                 self.single_timer.start()
 
         self.last_press_time = press_time
+
+    def single_hander_wrapper(self):
+        log_stuff("Single tap.")
+        self.single_handler()
 
     def button_released(self):
         self.press_start_time = 0
@@ -83,6 +88,7 @@ class button_handler:
         # if button still held after LONG_HOLD_TIME, it's a long hold
         if GPIO.input(self.PIN) == GPIO.HIGH and self.press_start_time == start_time:
             if self.long_handler:
+                log_stuff("Long press.")
                 self.long_handler()
 
 def toggle_bin_display():
@@ -91,16 +97,28 @@ def toggle_bin_display():
     update_bin_indicator()
 
 def show_next_bin(sched):
-    log_stuff("Double tap: show next bin collection")
-    sched.statusLED.push_job("next_bin", 50, lambda led: LEDpatterns.solid_colour(led, (0,0,100)))
-    time.sleep(1)
-    sched.statusLED.remove_job("next_bin")
+    log_stuff("Show next bin collection.")
+    if len(date_information_int) == 0:
+        # if there's no bin information, show error on status LED
+        sched.statusLED.push_job("error", 50, lambda led: LEDpatterns.error(led))
+        return
+    today_int = datetime.now().date()
+    next_bin_int = 100
+    next_bin_key = []
+    for bin in bin_colours.keys():
+        if (date_information_int[bin] - today_int).days < next_bin_int:
+            # loop over dictionary of bin dates and collect next closest
+            next_bin_int = (date_information_int[bin] - today_int).days
+            next_bin_key = bin
+    # call next bin indicator function (solid for 1s, then flash according to number of days until collection)
+    sched.binLED.push_job("user_request_next_bin", 50, lambda led, next_bin_int: LEDpatterns.next_bin(led, bin_colours[next_bin_key], next_bin_int))
 
 def soft_reset(sched):
-    log_stuff("Long press: soft reset")
+    log_stuff("Soft reset.")
     sched.statusLED.push_job("soft_reset", 50, lambda led: LEDpatterns.solid_colour(led, (100,0,100)))
     time.sleep(1)
     sched.statusLED.remove_job("soft_reset")
+    LEDpatterns.turn_off(sched.statusLED)
 
 # --------------------- Scheduler ---------------------
 class Scheduler:
@@ -205,10 +223,10 @@ def update_bin_indicator():
         today_int = datetime.now().date()
         for bin in bin_colours.keys():
             if (date_information_int[bin] - today_int).days == 1:
-                sched.binLED.push_job("nextBin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[bin]))
+                sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[bin]))
     else:
         log_stuff("[Bin] Turning off bin indicator")
-        sched.binLED.remove_job("nextBin")
+        sched.binLED.remove_job("scheduled_next_bin")
 
 def check_scheduler(sched):
     # debug check
