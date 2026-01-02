@@ -50,6 +50,12 @@ class button_handler:
         self.double_handler = double_fun
         self.long_handler = long_fun
 
+    def edge_detected(self, channel):
+        if GPIO.input(channel) == GPIO.HIGH:
+            self.button_pressed()
+        else:
+            self.button_released()
+    
     def button_pressed(self):
         press_time = time.monotonic()
         delta = press_time - self.last_press_time
@@ -271,12 +277,7 @@ if __name__ == "__main__":
                                           single_fun=toggle_bin_display,
                                           double_fun=lambda: show_next_bin(sched),
                                           long_fun=lambda: soft_reset(sched))
-    GPIO.add_event_callback(
-        BUTTON_PIN,
-        lambda: (
-            touch_button_handler.button_pressed() if GPIO.input(BUTTON_PIN) == GPIO.HIGH else touch_button_handler.button_released()
-        )
-    )
+    GPIO.add_event_callback(BUTTON_PIN, touch_button_handler.edge_detected)
 
     try:
         sched.run()
