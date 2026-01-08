@@ -18,7 +18,7 @@ from LEDcontroller import LEDcontroller
 import LEDpatterns
 
 # ------------- Configuration variables --------------
-# TODO: read these in from config file
+# TODO: read these in from TOML config file
 start_bin_schedule = 16 # 24 hour clock
 stop_bin_schedule = 23 # 24 hour clock
 web_scrape_schedule = 12 # 24 hour clock
@@ -119,10 +119,12 @@ class Scheduler:
 
 # ---------------- Logging ----------------
 def log_stuff(message):
+    # TODO: actual logging to file
     print(f"[{datetime.now()}] " + message)
 
 # -------------- Event Jobs ----------------
 def heartbeat(sched):
+    # TODO: check health of scheduler
     sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.heartbeat(led))
     time.sleep(1)
     sched.statusLED.remove_job("heartbeat")
@@ -131,12 +133,13 @@ def heartbeat(sched):
 
 def soft_reset(sched):
     log_stuff("Soft reset.")
+    # TODO: perform reset of scheduler / bindicator etc, POST again
     sched.statusLED.push_job("soft_reset", 50, lambda led: LEDpatterns.solid_colour(led, (100,0,100)))
     time.sleep(1)
     sched.statusLED.remove_job("soft_reset")
     LEDpatterns.turn_off(sched.statusLED)
 
-class binSchedule:
+class binSchedule: # class container for the web-scraper
     def __init__(self):
         self.date_information_int = []
     
@@ -181,7 +184,7 @@ def show_next_bin(sched):
     # call next bin indicator function (solid for 1s, then flash according to number of days until collection)
     sched.binLED.push_job("user_request_next_bin", 50, lambda led: LEDpatterns.next_bin(led, bin_colours[next_bin_key], next_bin_int))
 
-class binIndicatorController:
+class binIndicatorController: # class container for the bin indicator LED controller functions
     def __init__(self):
         self.reset()
 
@@ -227,8 +230,32 @@ class binIndicatorController:
 
 # ------- Helper functions --------
 def POST(sched):
-    # blink bin indicator, pretty rainbow and stuff
-    pass
+    for h in range(180, 540, 5):
+        RGB = HSVtoRGB(h, 1, 1)
+        sched.binLED.push_job("POST", 50, lambda led: LEDpatterns.solid_colour(led, RGB))
+        time.sleep(0.02)
+    time.sleep(0.5)
+    sched.binLED.remove_job("POST")
+
+def HSVtoRGB(hue, saturation, value):
+    maxRGB = 100
+    chroma = value * saturation
+    X = chroma * (1 - abs((hue / 60) % 2 - 1))
+    m = value - chroma
+    sector = int(hue // 60) % 6
+    rgb_table = [
+        (chroma, X, 0),  # 0 ≤ H < 60
+        (X, chroma, 0),  # 60 ≤ H < 120
+        (0, chroma, X),  # 120 ≤ H < 180
+        (0, X, chroma),  # 180 ≤ H < 240
+        (X, 0, chroma),  # 240 ≤ H < 300
+        (chroma, 0, X),  # 300 ≤ H < 360
+    ]
+    RGB = (rgb_table[sector])
+    R = (RGB[0] + m) * maxRGB
+    G = (RGB[1] + m) * maxRGB
+    B = (RGB[2] + m) * maxRGB
+    return (R, G, B)
 
 def next_schedule_time(hour):
     now = datetime.now()
@@ -292,6 +319,7 @@ if __name__ == "__main__":
 
     # Kick off initial jobs
     sched.schedule(datetime.now() + timedelta(seconds=1), heartbeat, sched)
+    sched.schedule(datetime.now() + timedelta(seconds=0.9), POST, sched)
     sched.schedule(datetime.now() + timedelta(seconds=2), binSched.web_scrape, sched)
     sched.schedule(datetime.now() + timedelta(seconds=10), binIndicator.update_bin_indicator, sched)
 
