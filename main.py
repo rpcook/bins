@@ -181,58 +181,49 @@ def show_next_bin(sched):
     # call next bin indicator function (solid for 1s, then flash according to number of days until collection)
     sched.binLED.push_job("user_request_next_bin", 50, lambda led: LEDpatterns.next_bin(led, bin_colours[next_bin_key], next_bin_int))
 
-# class binIndicatorController:
-#     def __init__(self):
-#         self.reset()
+class binIndicatorController:
+    def __init__(self):
+        self.reset()
 
-#     def reset(self):
-#         self.bin_display_state = True
-#         if datetime.now().hour >= start_bin_schedule and datetime.now().hour < stop_bin_schedule:
-#             self.bin_schedule_state = True
-#         else:
-#             self.bin_schedule_state = False
+    def reset(self):
+        self.bin_display_state = True
+        if datetime.now().hour >= start_bin_schedule and datetime.now().hour < stop_bin_schedule:
+            self.bin_schedule_state = True
+        else:
+            self.bin_schedule_state = False
 
-bin_display_state = True
-if datetime.now().hour >= start_bin_schedule and datetime.now().hour < stop_bin_schedule:
-    bin_schedule_state = True
-else:
-    bin_schedule_state = False
+    def show_bin_indicator(self, sched):
+        self.bin_schedule_state = True
+        self.bin_display_state = True
+        self.update_bin_indicator(sched)
+        time.sleep(10)
+        log_stuff("[Main] Bin indicator on for 4pm")
+        sched.schedule(next_schedule_time(start_bin_schedule), self.show_bin_indicator, sched)
 
-def show_bin_indicator(sched):
-    global bin_schedule_state, bin_display_state
-    bin_schedule_state = True
-    bin_display_state = True
-    update_bin_indicator()
-    time.sleep(10)
-    log_stuff("[Main] Bin indicator on for 4pm")
-    sched.schedule(next_schedule_time(start_bin_schedule), show_bin_indicator, sched)
+    def hide_bin_indicator(self, sched):
+        self.bin_schedule_state = False
+        self.update_bin_indicator(sched)
+        time.sleep(10)
+        log_stuff("[Main] Bin indicator off at 11pm")
+        sched.schedule(next_schedule_time(stop_bin_schedule), self.hide_bin_indicator, sched)
 
-def hide_bin_indicator(sched):
-    global bin_schedule_state
-    bin_schedule_state = False
-    update_bin_indicator()
-    time.sleep(10)
-    log_stuff("[Main] Bin indicator off at 11pm")
-    sched.schedule(next_schedule_time(stop_bin_schedule), hide_bin_indicator, sched)
+    def toggle_bin_display(self, sched):
+        self.bin_display_state = not self.bin_display_state
+        self.update_bin_indicator(sched)
 
-def toggle_bin_display():
-    global bin_display_state
-    bin_display_state = not bin_display_state
-    update_bin_indicator()
-
-def update_bin_indicator():
-    if bin_display_state and bin_schedule_state:
-        date_information = sched.binSched.getBinDates()
-        log_stuff("[Bin] Updating indicator illumination")
-        if len(date_information) == 0:
-            return
-        today_int = datetime.now().date()
-        for bin in bin_colours.keys():
-            if (date_information[bin] - today_int).days == 1:
-                sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[bin]))
-    else:
-        log_stuff("[Bin] Turning off bin indicator")
-        sched.binLED.remove_job("scheduled_next_bin")
+    def update_bin_indicator(self, sched):
+        if self.bin_display_state and self.bin_schedule_state:
+            date_information = sched.binSched.getBinDates()
+            log_stuff("[Bin] Updating indicator illumination")
+            if len(date_information) == 0:
+                return
+            today_int = datetime.now().date()
+            for bin in bin_colours.keys():
+                if (date_information[bin] - today_int).days == 1:
+                    sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[bin]))
+        else:
+            log_stuff("[Bin] Turning off bin indicator")
+            sched.binLED.remove_job("scheduled_next_bin")
 
 # ------- Helper functions --------
 def POST(sched):
@@ -293,19 +284,22 @@ if __name__ == "__main__":
     # instantiate binSchedule class
     binSched = binSchedule()
 
+    # instantiate binIndicatorController
+    binIndicator = binIndicatorController()
+
     # instantiate scheduler class
     sched = Scheduler(status_led, bin_led, binSched)
 
     # Kick off initial jobs
     sched.schedule(datetime.now() + timedelta(seconds=1), heartbeat, sched)
     sched.schedule(datetime.now() + timedelta(seconds=2), binSched.web_scrape, sched)
-    sched.schedule(datetime.now() + timedelta(seconds=10), update_bin_indicator)
+    sched.schedule(datetime.now() + timedelta(seconds=10), binIndicator.update_bin_indicator, sched)
 
     # Schedule bin indicator illumination
     log_stuff("[Main] Bin indicator on for 4pm")
-    sched.schedule(next_schedule_time(start_bin_schedule), show_bin_indicator, sched)
+    sched.schedule(next_schedule_time(start_bin_schedule), binIndicator.show_bin_indicator, sched)
     log_stuff("[Main] Bin indicator off at 11pm")
-    sched.schedule(next_schedule_time(stop_bin_schedule), hide_bin_indicator, sched)
+    sched.schedule(next_schedule_time(stop_bin_schedule), binIndicator.hide_bin_indicator, sched)
 
     # set default bin illumination (off)
     sched.binLED.push_job("defaultOff", 1, lambda led: LEDpatterns.turn_off(led))
@@ -314,7 +308,7 @@ if __name__ == "__main__":
     # Set up event detection for rising / falling edges
     GPIO.add_event_detect(BUTTON_PIN, GPIO.BOTH, bouncetime=10)
     touch_button_handler = button_handler(PIN=BUTTON_PIN,
-                                          single_fun=toggle_bin_display,
+                                          single_fun=lambda: binIndicator.toggle_bin_display(sched),
                                           double_fun=lambda: show_next_bin(sched),
                                           long_fun=lambda: soft_reset(sched))
     GPIO.add_event_callback(BUTTON_PIN, touch_button_handler.edge_detected)
