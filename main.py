@@ -29,15 +29,7 @@ bin_colours = {
     "purple" : (100,  0,100)
     }
 
-# ----------------- Global variables ------------------
-date_information_int = []
-bin_display_state = True
-if datetime.now().hour >= start_bin_schedule and datetime.now().hour < stop_bin_schedule:
-    bin_schedule_state = True
-else:
-    bin_schedule_state = False
-
-# --------- User input control functions --------------
+# ---------- User input control class ---------------
 class button_handler:
     def __init__(self, PIN, single_fun=None, double_fun=None, long_fun=None, DOUBLE_TAP_TIME=0.3, LONG_HOLD_TIME=0.5):
         self.PIN = PIN
@@ -91,43 +83,15 @@ class button_handler:
                 log_stuff("Long press.")
                 self.long_handler()
 
-def toggle_bin_display():
-    global bin_display_state
-    bin_display_state = not bin_display_state
-    update_bin_indicator()
-
-def show_next_bin(sched):
-    log_stuff("Show next bin collection.")
-    if len(date_information_int) == 0:
-        # if there's no bin information, show error on status LED
-        sched.statusLED.push_job("error", 50, lambda led: LEDpatterns.error(led))
-        return
-    today_int = datetime.now().date()
-    next_bin_int = 100
-    next_bin_key = []
-    for bin in bin_colours.keys():
-        if (date_information_int[bin] - today_int).days < next_bin_int:
-            # loop over dictionary of bin dates and collect next closest
-            next_bin_int = (date_information_int[bin] - today_int).days
-            next_bin_key = bin
-    # call next bin indicator function (solid for 1s, then flash according to number of days until collection)
-    sched.binLED.push_job("user_request_next_bin", 50, lambda led: LEDpatterns.next_bin(led, bin_colours[next_bin_key], next_bin_int))
-
-def soft_reset(sched):
-    log_stuff("Soft reset.")
-    sched.statusLED.push_job("soft_reset", 50, lambda led: LEDpatterns.solid_colour(led, (100,0,100)))
-    time.sleep(1)
-    sched.statusLED.remove_job("soft_reset")
-    LEDpatterns.turn_off(sched.statusLED)
-
-# --------------------- Scheduler ---------------------
+# -------------- Scheduler class---------------------
 class Scheduler:
-    def __init__(self, status_led_controller, bindicator_led_controller):
+    def __init__(self, status_led_controller, bindicator_led_controller, binSched):
         self.events = []
         self.lock = threading.Lock()
         self.running = True
         self.statusLED = status_led_controller
         self.binLED = bindicator_led_controller
+        self.binSched = binSched
 
     def schedule(self, when, func, *args, **kwargs):
         with self.lock:
@@ -165,26 +129,74 @@ def heartbeat(sched):
     # reschedule itself
     sched.schedule(datetime.now() + timedelta(seconds=10), heartbeat, sched)
 
-def web_scrape(sched):
-    global date_information_int
-    sched.statusLED.push_job("web_scrape", 10, lambda led: LEDpatterns.web_activity(led))
-    log_stuff("[Scraper] Starting web scrape...")
-    try:
-        with open("address.txt") as f:
-            source = scraper.scrape_bin_date_website(f.readline())
-        date_information_dict = webparser.parse_bin_table_to_dict(source)
-        date_information_int = webparser.parse_dates(date_information_dict)
-        log_stuff("[Scraper] Successfully finished web scrape.")
-        sched.statusLED.push_job("success", 20, lambda led: LEDpatterns.success(led))
-        # reschedule scraping for 12pm
-        log_stuff("[Scraper] Rescheduling for 12pm")
-        sched.schedule(next_schedule_time(web_scrape_schedule), web_scrape, sched)
-    except:
-        log_stuff("[Scraper] Fatal error in scraper")
-        # reschedule for 10 minutes time
-        log_stuff("[Scraper] Rescheduling for 10 minutes time")
-        sched.schedule(datetime.now() + timedelta(minutes=10), web_scrape, sched)
-    sched.statusLED.remove_job("web_scrape")
+def soft_reset(sched):
+    log_stuff("Soft reset.")
+    sched.statusLED.push_job("soft_reset", 50, lambda led: LEDpatterns.solid_colour(led, (100,0,100)))
+    time.sleep(1)
+    sched.statusLED.remove_job("soft_reset")
+    LEDpatterns.turn_off(sched.statusLED)
+
+class binSchedule:
+    def __init__(self):
+        self.date_information_int = []
+    
+    def web_scrape(self, sched):
+        sched.statusLED.push_job("web_scrape", 10, lambda led: LEDpatterns.web_activity(led))
+        log_stuff("[Scraper] Starting web scrape...")
+        try:
+            with open("address.txt") as f:
+                source = scraper.scrape_bin_date_website(f.readline())
+            date_information_dict = webparser.parse_bin_table_to_dict(source)
+            self.date_information_int = webparser.parse_dates(date_information_dict)
+            log_stuff("[Scraper] Successfully finished web scrape.")
+            sched.statusLED.push_job("success", 20, lambda led: LEDpatterns.success(led))
+            # reschedule scraping for 12pm
+            log_stuff("[Scraper] Rescheduling for 12pm")
+            sched.schedule(next_schedule_time(web_scrape_schedule), sched.binSched.web_scrape, sched)
+        except:
+            log_stuff("[Scraper] Fatal error in scraper")
+            # reschedule for 10 minutes time
+            log_stuff("[Scraper] Rescheduling for 10 minutes time")
+            sched.schedule(datetime.now() + timedelta(minutes=10), sched.binSched.web_scrape, sched)
+        sched.statusLED.remove_job("web_scrape")
+    
+    def getBinDates(self):
+        return self.date_information_int
+
+def show_next_bin(sched):
+    log_stuff("Show next bin collection.")
+    date_information = sched.binSched.getBinDates()
+    if len(date_information) == 0:
+        # if there's no bin information, show error on status LED
+        sched.statusLED.push_job("error", 50, lambda led: LEDpatterns.error(led))
+        return
+    today_int = datetime.now().date()
+    next_bin_int = 100
+    next_bin_key = []
+    for bin in bin_colours.keys():
+        if (date_information[bin] - today_int).days < next_bin_int:
+            # loop over dictionary of bin dates and collect next closest
+            next_bin_int = (date_information[bin] - today_int).days
+            next_bin_key = bin
+    # call next bin indicator function (solid for 1s, then flash according to number of days until collection)
+    sched.binLED.push_job("user_request_next_bin", 50, lambda led: LEDpatterns.next_bin(led, bin_colours[next_bin_key], next_bin_int))
+
+# class binIndicatorController:
+#     def __init__(self):
+#         self.reset()
+
+#     def reset(self):
+#         self.bin_display_state = True
+#         if datetime.now().hour >= start_bin_schedule and datetime.now().hour < stop_bin_schedule:
+#             self.bin_schedule_state = True
+#         else:
+#             self.bin_schedule_state = False
+
+bin_display_state = True
+if datetime.now().hour >= start_bin_schedule and datetime.now().hour < stop_bin_schedule:
+    bin_schedule_state = True
+else:
+    bin_schedule_state = False
 
 def show_bin_indicator(sched):
     global bin_schedule_state, bin_display_state
@@ -203,6 +215,25 @@ def hide_bin_indicator(sched):
     log_stuff("[Main] Bin indicator off at 11pm")
     sched.schedule(next_schedule_time(stop_bin_schedule), hide_bin_indicator, sched)
 
+def toggle_bin_display():
+    global bin_display_state
+    bin_display_state = not bin_display_state
+    update_bin_indicator()
+
+def update_bin_indicator():
+    if bin_display_state and bin_schedule_state:
+        date_information = sched.binSched.getBinDates()
+        log_stuff("[Bin] Updating indicator illumination")
+        if len(date_information) == 0:
+            return
+        today_int = datetime.now().date()
+        for bin in bin_colours.keys():
+            if (date_information[bin] - today_int).days == 1:
+                sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[bin]))
+    else:
+        log_stuff("[Bin] Turning off bin indicator")
+        sched.binLED.remove_job("scheduled_next_bin")
+
 # ------- Helper functions --------
 def POST(sched):
     # blink bin indicator, pretty rainbow and stuff
@@ -214,19 +245,6 @@ def next_schedule_time(hour):
     if run_at < now:
         run_at += timedelta(days=1)
     return run_at
-
-def update_bin_indicator():
-    if bin_display_state and bin_schedule_state:
-        log_stuff("[Bin] Updating indicator illumination")
-        if len(date_information_int) == 0:
-            return
-        today_int = datetime.now().date()
-        for bin in bin_colours.keys():
-            if (date_information_int[bin] - today_int).days == 1:
-                sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[bin]))
-    else:
-        log_stuff("[Bin] Turning off bin indicator")
-        sched.binLED.remove_job("scheduled_next_bin")
 
 def check_scheduler(sched):
     # debug check
@@ -272,11 +290,15 @@ if __name__ == "__main__":
 
     bin_led = LEDcontroller(tuple(pwms))
 
-    sched = Scheduler(status_led, bin_led)
+    # instantiate binSchedule class
+    binSched = binSchedule()
+
+    # instantiate scheduler class
+    sched = Scheduler(status_led, bin_led, binSched)
 
     # Kick off initial jobs
     sched.schedule(datetime.now() + timedelta(seconds=1), heartbeat, sched)
-    sched.schedule(datetime.now() + timedelta(seconds=2), web_scrape, sched)
+    sched.schedule(datetime.now() + timedelta(seconds=2), binSched.web_scrape, sched)
     sched.schedule(datetime.now() + timedelta(seconds=10), update_bin_indicator)
 
     # Schedule bin indicator illumination
