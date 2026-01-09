@@ -134,6 +134,11 @@ def heartbeat(sched):
 def soft_reset(sched):
     log_stuff("Soft reset.")
     # TODO: perform reset of scheduler / bindicator etc, POST again
+    binIndicator.reset() # reset status of bin indicator
+    # reset scheduler queue
+    # assign start-up jobs to scheduler queue
+    # POST bindicator
+    POST(sched)
     sched.statusLED.push_job("soft_reset", 50, lambda led: LEDpatterns.solid_colour(led, (100,0,100)))
     time.sleep(1)
     sched.statusLED.remove_job("soft_reset")
@@ -230,11 +235,11 @@ class binIndicatorController: # class container for the bin indicator LED contro
 
 # ------- Helper functions --------
 def POST(sched):
-    for h in range(180, 540, 5):
+    for h in range(180, 481+360, 2):
         RGB = HSVtoRGB(h, 1, 1)
         sched.binLED.push_job("POST", 50, lambda led: LEDpatterns.solid_colour(led, RGB))
         time.sleep(0.02)
-    time.sleep(0.5)
+    time.sleep(2)
     sched.binLED.remove_job("POST")
 
 def HSVtoRGB(hue, saturation, value):
@@ -311,11 +316,11 @@ if __name__ == "__main__":
     # instantiate binSchedule class
     binSched = binSchedule()
 
-    # instantiate binIndicatorController
-    binIndicator = binIndicatorController()
-
     # instantiate scheduler class
     sched = Scheduler(status_led, bin_led, binSched)
+
+    # instantiate binIndicatorController
+    binIndicator = binIndicatorController()
 
     # Kick off initial jobs
     sched.schedule(datetime.now() + timedelta(seconds=1), heartbeat, sched)
