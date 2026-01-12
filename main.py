@@ -3,6 +3,7 @@ import heapq
 import threading
 import time
 from datetime import datetime, timedelta
+import tomllib
 
 # ---- GPIO library with mock for PC development ----
 try:
@@ -18,16 +19,14 @@ from LEDcontroller import LEDcontroller
 import LEDpatterns
 
 # ------------- Configuration variables --------------
-# TODO: read these in from TOML config file
-start_bin_schedule = 16 # 24 hour clock
-stop_bin_schedule = 23 # 24 hour clock
-web_scrape_schedule = 12 # 24 hour clock
-bin_colours = {
-    "black"  : (100,100,100), 
-    "brown"  : (100, 38,  0),
-    "blue"   : (  0,  0,100),
-    "purple" : (100,  0,100)
-    }
+with open("config.toml", "rb") as f:
+    config = tomllib.load(f)
+
+start_bin_schedule = config["display_on"]
+stop_bin_schedule = config["display_off"]
+web_scrape_schedule = config["poll_web"]
+
+bin_colours = {k: tuple(v) for k, v in config["bin_colours"].items()}
 
 # ---------- User input control class ---------------
 class button_handler:
@@ -168,6 +167,10 @@ class binSchedule: # class container for the web-scraper
             sched.schedule(datetime.now() + timedelta(minutes=10), sched.binSched.web_scrape, sched)
         sched.statusLED.remove_job("web_scrape")
     
+    def getNextBin(self):
+        # TODO: return list of next bins (to handle corner case of two bins on same day)
+        pass
+
     def getBinDates(self):
         return self.date_information_int
 

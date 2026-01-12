@@ -1,0 +1,15 @@
+## scheduled times for regular jobs, 24 hour clock
+# When to start displaying the bindicator
+display_on = 16
+# When to stop displaying the bindicator (unless cancelled earlier by user)
+display_off = 23
+# when to poll the web for new bin information
+poll_web = 12
+
+## RGB colour value for bindicator to display
+# RGB range 0-100
+[bin_colours]
+black  = [100,100,100] 
+brown  = [100, 38,  0]
+blue   = [  0,  0,100]
+purple = [100,  0,100]
