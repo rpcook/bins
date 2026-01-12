@@ -123,8 +123,20 @@ def log_stuff(message):
 
 # -------------- Event Jobs ----------------
 def heartbeat(sched):
-    # TODO: check health of scheduler
-    sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.heartbeat(led))
+    # Check health of schedulers
+    scheulerQueueLength = len(sched.events)
+    statusLEDqueueLength = len(sched.statusLED.jobs)
+    binLEDqueueLength = len(sched.binLED.jobs)
+    if (scheulerQueueLength <= 1 or 
+        scheulerQueueLength > 10 or
+        statusLEDqueueLength > 10 or
+        binLEDqueueLength > 10):
+        # job queue is either too empty or is filling up
+        # flash amber heartbeat
+        sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.heartbeat(led, (4,2,0)))
+    else:
+        # size of job queue is in expected bounds, flash green heartbeat
+        sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.heartbeat(led, (0,4,0)))
     time.sleep(1)
     sched.statusLED.remove_job("heartbeat")
     # reschedule itself
@@ -271,11 +283,6 @@ def next_schedule_time(hour):
     if run_at < now:
         run_at += timedelta(days=1)
     return run_at
-
-def check_scheduler(sched):
-    # debug check
-    for task in sched.events:
-        print(task)
 
 # ---------------- Main ----------------
 if __name__ == "__main__":
