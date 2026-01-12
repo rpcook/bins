@@ -37,10 +37,11 @@ Web scraper to determine next collection hosted on a Raspberry Pi. On the day be
 - ~~Catch maintenance mode on website~~
 - Logging
   - Management of log size
-- Rainbow POST for bin
+- ~~Rainbow POST for bin~~
 - ~~Different user inputs~~
 
-## Open Source Project (HACS Waste Collection)
-- Modify scraper to run in HACS installation
-- Test
-- Submit pull-request to HACS Waste Collection project
+## Someone beat me to it:
+~~## Open Source Project (HACS Waste Collection)~~
+- ~~Modify scraper to run in HACS installation~~
+- ~~Test~~
+- ~~Submit pull-request to HACS Waste Collection project~~
