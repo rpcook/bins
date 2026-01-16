@@ -197,7 +197,7 @@ def show_next_bin(sched):
     next_bin_int = 100
     next_bin_key = []
     for bin in bin_colours.keys():
-        if (date_information[bin] - today_int).days < next_bin_int:
+        if (date_information[bin] - today_int).days < next_bin_int and (date_information[bin] - today_int).days > 0:
             # loop over dictionary of bin dates and collect next closest
             next_bin_int = (date_information[bin] - today_int).days
             next_bin_key = bin
