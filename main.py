@@ -84,13 +84,14 @@ class button_handler:
 
 # -------------- Scheduler class---------------------
 class Scheduler:
-    def __init__(self, status_led_controller, bindicator_led_controller, binSched):
+    def __init__(self, status_led_controller, bindicator_led_controller, binSched, binIndicator):
         self.events = []
         self.lock = threading.Lock()
         self.running = True
         self.statusLED = status_led_controller
         self.binLED = bindicator_led_controller
         self.binSched = binSched
+        self.binIndicator = binIndicator
 
     def schedule(self, when, func, *args, **kwargs):
         with self.lock:
@@ -98,6 +99,11 @@ class Scheduler:
 
     def stop(self):
         self.running = False
+
+    def clearHeap(self):
+        with self.lock:
+            blankEventList = []
+            heapq.heapify(blankEventList)
 
     def run(self):
         while self.running:
@@ -144,16 +150,16 @@ def heartbeat(sched):
 
 def soft_reset(sched):
     log_stuff("Soft reset.")
-    # TODO: perform reset of scheduler / bindicator etc, POST again
-    binIndicator.reset() # reset status of bin indicator
-    # reset scheduler queue
-    # assign start-up jobs to scheduler queue
     # POST bindicator
     POST(sched)
-    sched.statusLED.push_job("soft_reset", 50, lambda led: LEDpatterns.solid_colour(led, (100,0,100)))
-    time.sleep(1)
-    sched.statusLED.remove_job("soft_reset")
-    LEDpatterns.turn_off(sched.statusLED)
+    time.sleep(2)
+    sched.binIndicator.reset() # reset status of bin indicator
+    # reset scheduler queue
+    sched.clearHeap()
+    sched.statusLED.clear_jobs()
+    sched.binLED.clear_jobs()
+    # assign start-up jobs to scheduler queue
+    set_initial_jobs(sched)
 
 class binSchedule: # class container for the web-scraper
     def __init__(self):
@@ -284,6 +290,21 @@ def next_schedule_time(hour):
         run_at += timedelta(days=1)
     return run_at
 
+def set_initial_jobs(sched):
+    sched.schedule(datetime.now() + timedelta(seconds=1), heartbeat, sched)
+    sched.schedule(datetime.now() + timedelta(seconds=0.9), POST, sched)
+    sched.schedule(datetime.now() + timedelta(seconds=2), sched.binSched.web_scrape, sched)
+    sched.schedule(datetime.now() + timedelta(seconds=10), sched.binIndicator.update_bin_indicator, sched)
+
+    # Schedule bin indicator illumination
+    log_stuff("[Main] Bin indicator on for 4pm")
+    sched.schedule(next_schedule_time(start_bin_schedule), sched.binIndicator.show_bin_indicator, sched)
+    log_stuff("[Main] Bin indicator off at 11pm")
+    sched.schedule(next_schedule_time(stop_bin_schedule), sched.binIndicator.hide_bin_indicator, sched)
+
+    # set default bin illumination (off)
+    sched.binLED.push_job("defaultOff", 1, lambda led: LEDpatterns.turn_off(led))
+
 # ---------------- Main ----------------
 if __name__ == "__main__":
     # --------------- Configure GPIO -------------------
@@ -326,26 +347,14 @@ if __name__ == "__main__":
     # instantiate binSchedule class
     binSched = binSchedule()
 
-    # instantiate scheduler class
-    sched = Scheduler(status_led, bin_led, binSched)
-
     # instantiate binIndicatorController
     binIndicator = binIndicatorController()
 
+    # instantiate scheduler class
+    sched = Scheduler(status_led, bin_led, binSched, binIndicator)
+
     # Kick off initial jobs
-    sched.schedule(datetime.now() + timedelta(seconds=1), heartbeat, sched)
-    sched.schedule(datetime.now() + timedelta(seconds=0.9), POST, sched)
-    sched.schedule(datetime.now() + timedelta(seconds=2), binSched.web_scrape, sched)
-    sched.schedule(datetime.now() + timedelta(seconds=10), binIndicator.update_bin_indicator, sched)
-
-    # Schedule bin indicator illumination
-    log_stuff("[Main] Bin indicator on for 4pm")
-    sched.schedule(next_schedule_time(start_bin_schedule), binIndicator.show_bin_indicator, sched)
-    log_stuff("[Main] Bin indicator off at 11pm")
-    sched.schedule(next_schedule_time(stop_bin_schedule), binIndicator.hide_bin_indicator, sched)
-
-    # set default bin illumination (off)
-    sched.binLED.push_job("defaultOff", 1, lambda led: LEDpatterns.turn_off(led))
+    set_initial_jobs(sched)
 
     # button listener
     # Set up event detection for rising / falling edges
