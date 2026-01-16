@@ -34,8 +34,8 @@ Web scraper to determine next collection hosted on a Raspberry Pi. On the day be
 - Install bin model
 - ~~Error handling~~
 - Support corner case of same bin-day
-- Robust watchdog etc
-  - Soft-reset function
+- ~~Robust watchdog etc~~
+  - ~~Soft-reset function~~
 - ~~Catch maintenance mode on website~~
 - Logging
   - Management of log size
