@@ -293,8 +293,8 @@ def next_schedule_time(hour):
 def set_initial_jobs(sched):
     sched.schedule(datetime.now() + timedelta(seconds=1), heartbeat, sched)
     sched.schedule(datetime.now() + timedelta(seconds=0.9), POST, sched)
-    sched.schedule(datetime.now() + timedelta(seconds=4), sched.binSched.web_scrape, sched)
-    sched.schedule(datetime.now() + timedelta(seconds=12), sched.binIndicator.update_bin_indicator, sched)
+    sched.schedule(datetime.now() + timedelta(seconds=6), sched.binSched.web_scrape, sched)
+    sched.schedule(datetime.now() + timedelta(seconds=14), sched.binIndicator.update_bin_indicator, sched)
 
     # Schedule bin indicator illumination
     log_stuff("[Main] Bin indicator on for 4pm")
