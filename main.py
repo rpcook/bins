@@ -150,9 +150,9 @@ def heartbeat(sched):
 
 def soft_reset(sched):
     log_stuff("Soft reset.")
-    # POST bindicator
-    POST(sched)
-    time.sleep(2)
+    sched.statusLED.push_job("reset", 70, lambda led: LEDpatterns.solid_colour(led, (20,0,0)))
+    time.sleep(1)
+    sched.statusLED.remove_job("reset")
     sched.binIndicator.reset() # reset status of bin indicator
     # reset scheduler queue
     sched.clearHeap()
@@ -259,8 +259,8 @@ def POST(sched):
     for h in range(180, 481+360, 2):
         RGB = HSVtoRGB(h, 1, 1)
         sched.binLED.push_job("POST", 50, lambda led: LEDpatterns.solid_colour(led, RGB))
-        time.sleep(0.02)
-    time.sleep(2)
+        time.sleep(0.01)
+    sched.binLED.push_job("success", 60, lambda led: LEDpatterns.success(led, 100))
     sched.binLED.remove_job("POST")
 
 def HSVtoRGB(hue, saturation, value):
@@ -293,8 +293,8 @@ def next_schedule_time(hour):
 def set_initial_jobs(sched):
     sched.schedule(datetime.now() + timedelta(seconds=1), heartbeat, sched)
     sched.schedule(datetime.now() + timedelta(seconds=0.9), POST, sched)
-    sched.schedule(datetime.now() + timedelta(seconds=2), sched.binSched.web_scrape, sched)
-    sched.schedule(datetime.now() + timedelta(seconds=10), sched.binIndicator.update_bin_indicator, sched)
+    sched.schedule(datetime.now() + timedelta(seconds=4), sched.binSched.web_scrape, sched)
+    sched.schedule(datetime.now() + timedelta(seconds=12), sched.binIndicator.update_bin_indicator, sched)
 
     # Schedule bin indicator illumination
     log_stuff("[Main] Bin indicator on for 4pm")

@@ -34,9 +34,9 @@ def heartbeat(led, RGB):
         yield
     led._apply_rgb(0,0,0)
 
-def success(led):
+def success(led, brightness=30):
     for i in range(3):
-        led._apply_rgb(0,30,0)
+        led._apply_rgb(0,brightness,0)
         time.sleep(0.5)
         yield
         led._apply_rgb(0,0,0)
@@ -44,9 +44,9 @@ def success(led):
         yield
     led.remove_job("success")
 
-def error(led):
+def error(led, brightness=30):
     for i in range(3):
-        led._apply_rgb(30,0,0)
+        led._apply_rgb(brightness,0,0)
         time.sleep(0.5)
         yield
         led._apply_rgb(0,0,0)
