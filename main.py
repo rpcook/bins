@@ -4,11 +4,15 @@ import threading
 import time
 from datetime import datetime, timedelta
 import tomllib
+import logging
+from logging.handlers import TimedRotatingFileHandler
 
 # ---- GPIO library with mock for PC development ----
 try:
+    LOG_PATH = "~/logs/" # default log path (assumes Linux / RPi)
     import RPi.GPIO as GPIO # type: ignore
 except ImportError:
+    LOG_PATH = "./logs/"
     from MockGPIO import MockGPIO
     GPIO = MockGPIO()
 
@@ -55,7 +59,7 @@ class button_handler:
             if self.single_timer:
                 self.single_timer.cancel()
             if self.double_handler:
-                log_stuff("Double tap.")
+                logger.info("Double tap.")
                 self.double_handler()
         else:
             self.press_start_time = press_time
@@ -69,7 +73,7 @@ class button_handler:
         self.last_press_time = press_time
 
     def single_hander_wrapper(self):
-        log_stuff("Single tap.")
+        logger.info("Single tap.")
         self.single_handler()
 
     def button_released(self):
@@ -79,7 +83,7 @@ class button_handler:
         # if button still held after LONG_HOLD_TIME, it's a long hold
         if GPIO.input(self.PIN) == GPIO.HIGH and self.press_start_time == start_time:
             if self.long_handler:
-                log_stuff("Long press.")
+                logger.info("Long press.")
                 self.long_handler()
 
 # -------------- Scheduler class---------------------
@@ -123,9 +127,28 @@ class Scheduler:
                 time.sleep(0.5)
 
 # ---------------- Logging ----------------
-def log_stuff(message):
-    # TODO: actual logging to file
-    print(f"[{datetime.now()}] " + message)
+logger = logging.getLogger(__name__)
+def setup_logging():
+    LOG_LEVEL = logging.DEBUG
+    handler = TimedRotatingFileHandler(
+        filename=LOG_PATH + "bin.log",
+        when="M",              # rotate monthly
+        interval=1,            # every month
+        backupCount=6,         # keep 6 months
+        encoding="utf-8",
+        utc=False
+    )
+
+    handler.suffix = "%Y-%m"
+
+    formatter = logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
+    handler.setFormatter(formatter)
+
+    root = logging.getLogger()
+    root.setLevel(LOG_LEVEL)
+    root.addHandler(handler)
 
 # -------------- Event Jobs ----------------
 def heartbeat(sched):
@@ -149,7 +172,7 @@ def heartbeat(sched):
     sched.schedule(datetime.now() + timedelta(seconds=10), heartbeat, sched)
 
 def soft_reset(sched):
-    log_stuff("Soft reset.")
+    logger.info("Soft reset.")
     sched.statusLED.push_job("reset", 70, lambda led: LEDpatterns.solid_colour(led, (20,0,0)))
     time.sleep(1)
     sched.statusLED.remove_job("reset")
@@ -167,21 +190,21 @@ class binSchedule: # class container for the web-scraper
     
     def web_scrape(self, sched):
         sched.statusLED.push_job("web_scrape", 10, lambda led: LEDpatterns.web_activity(led))
-        log_stuff("[Scraper] Starting web scrape...")
+        logger.info("Starting web scrape...")
         try:
             with open("address.txt") as f:
                 source = scraper.scrape_bin_date_website(f.readline())
             date_information_dict = webparser.parse_bin_table_to_dict(source)
             self.date_information_int = webparser.parse_dates(date_information_dict)
-            log_stuff("[Scraper] Successfully finished web scrape.")
+            logger.info("Successfully finished web scrape.")
             sched.statusLED.push_job("success", 20, lambda led: LEDpatterns.success(led))
             # reschedule scraping for 12pm
-            log_stuff("[Scraper] Rescheduling for 12pm")
+            logger.info("Rescheduling for web scrape for next scheduled time")
             sched.schedule(next_schedule_time(web_scrape_schedule), sched.binSched.web_scrape, sched)
         except:
-            log_stuff("[Scraper] Fatal error in scraper")
+            logger.error("Fatal error in scraper")
             # reschedule for 10 minutes time
-            log_stuff("[Scraper] Rescheduling for 10 minutes time")
+            logger.info("Rescheduling web scrape for 10 minutes time")
             sched.schedule(datetime.now() + timedelta(minutes=10), sched.binSched.web_scrape, sched)
         sched.statusLED.remove_job("web_scrape")
     
@@ -193,7 +216,7 @@ class binSchedule: # class container for the web-scraper
         return self.date_information_int
 
 def show_next_bin(sched):
-    log_stuff("Show next bin collection.")
+    logger.info("Show next bin collection")
     date_information = sched.binSched.getBinDates()
     if len(date_information) == 0:
         # if there's no bin information, show error on status LED
@@ -226,14 +249,14 @@ class binIndicatorController: # class container for the bin indicator LED contro
         self.bin_display_state = True
         self.update_bin_indicator(sched)
         time.sleep(10)
-        log_stuff("[Main] Bin indicator on for 4pm")
+        logger.info("Added scheduled ON time for Bin Indicator to scheduler")
         sched.schedule(next_schedule_time(start_bin_schedule), self.show_bin_indicator, sched)
 
     def hide_bin_indicator(self, sched):
         self.bin_schedule_state = False
         self.update_bin_indicator(sched)
         time.sleep(10)
-        log_stuff("[Main] Bin indicator off at 11pm")
+        logger.info("Added scheduled OFF time for Bin Indicator to scheduler")
         sched.schedule(next_schedule_time(stop_bin_schedule), self.hide_bin_indicator, sched)
 
     def toggle_bin_display(self, sched):
@@ -243,7 +266,7 @@ class binIndicatorController: # class container for the bin indicator LED contro
     def update_bin_indicator(self, sched):
         if self.bin_display_state and self.bin_schedule_state:
             date_information = sched.binSched.getBinDates()
-            log_stuff("[Bin] Updating indicator illumination")
+            logger.info("Updating Bin Indicator illumination")
             if len(date_information) == 0:
                 return
             today_int = datetime.now().date()
@@ -251,7 +274,7 @@ class binIndicatorController: # class container for the bin indicator LED contro
                 if (date_information[bin] - today_int).days == 1:
                     sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[bin]))
         else:
-            log_stuff("[Bin] Turning off bin indicator")
+            logger.info("Turning off Bin Iindicator")
             sched.binLED.remove_job("scheduled_next_bin")
 
 # ------- Helper functions --------
@@ -292,21 +315,30 @@ def next_schedule_time(hour):
 
 def set_initial_jobs(sched):
     sched.schedule(datetime.now() + timedelta(seconds=1), heartbeat, sched)
+    logger.info("Added Heartbeat to scheduler")
     sched.schedule(datetime.now() + timedelta(seconds=0.9), POST, sched)
+    logger.info("Added POST to scheduler")
     sched.schedule(datetime.now() + timedelta(seconds=6), sched.binSched.web_scrape, sched)
+    logger.info("Added Web Scrape to scheduler")
     sched.schedule(datetime.now() + timedelta(seconds=14), sched.binIndicator.update_bin_indicator, sched)
+    logger.info("Added Update Bin Indicator to scheduler")
 
     # Schedule bin indicator illumination
-    log_stuff("[Main] Bin indicator on for 4pm")
     sched.schedule(next_schedule_time(start_bin_schedule), sched.binIndicator.show_bin_indicator, sched)
-    log_stuff("[Main] Bin indicator off at 11pm")
+    logger.info("Added scheduled ON time for Bin Indicator to scheduler")
     sched.schedule(next_schedule_time(stop_bin_schedule), sched.binIndicator.hide_bin_indicator, sched)
+    logger.info("Added scheduled OFF time for Bin Indicator to scheduler")
 
     # set default bin illumination (off)
     sched.binLED.push_job("defaultOff", 1, lambda led: LEDpatterns.turn_off(led))
+    logger.info("Added default OFF display to Bin Indicator LED to scheduler")
 
 # ---------------- Main ----------------
 if __name__ == "__main__":
+    # configure logging
+    setup_logging()
+    logger.info("Application launched")
+
     # --------------- Configure GPIO -------------------
     GPIO.setmode(GPIO.BCM) # BCM numbering
 
@@ -366,7 +398,9 @@ if __name__ == "__main__":
     GPIO.add_event_callback(BUTTON_PIN, touch_button_handler.edge_detected)
 
     try:
+        logger.info("Starting scheduler")
         sched.run()
     except KeyboardInterrupt:
+        logger.info("Keyboard interrupt caught, closing application")
         sched.stop()
         GPIO.cleanup()
