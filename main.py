@@ -9,7 +9,7 @@ from logging.handlers import TimedRotatingFileHandler
 
 # ---- GPIO library with mock for PC development ----
 try:
-    LOG_PATH = "~/logs/" # default log path (assumes Linux / RPi)
+    LOG_PATH = "/home/pi/logs/" # default log path (assumes Linux / RPi)
     import RPi.GPIO as GPIO # type: ignore
 except ImportError:
     LOG_PATH = "./logs/"
@@ -98,13 +98,16 @@ class Scheduler:
         self.binIndicator = binIndicator
 
     def schedule(self, when, func, *args, **kwargs):
+        logger.debug("Scheduler adding job.")
         with self.lock:
             heapq.heappush(self.events, (when, func, args, kwargs))
 
     def stop(self):
+        logger.debug("Scheduler stopping.")
         self.running = False
 
     def clearHeap(self):
+        logger.debug("Scheduler clearing heap")
         with self.lock:
             blankEventList = []
             heapq.heapify(blankEventList)
@@ -123,6 +126,7 @@ class Scheduler:
                 threading.Thread(
                     target=func, args=args, kwargs=kwargs, daemon=True
                 ).start()
+                logger.debug("Scheduler launching job.")
             else:
                 time.sleep(0.5)
 
@@ -130,6 +134,7 @@ class Scheduler:
 logger = logging.getLogger(__name__)
 def setup_logging():
     LOG_LEVEL = logging.DEBUG
+    # LOG_LEVEL = logging.INFO
     handler = TimedRotatingFileHandler(
         filename=LOG_PATH + "bin.log",
         when="M",              # rotate monthly
@@ -142,7 +147,7 @@ def setup_logging():
     handler.suffix = "%Y-%m"
 
     formatter = logging.Formatter(
-        "%(asctime)s %(levelname)s %(name)s: %(message)s"
+        "%(asctime)s %(levelname)s: %(message)s"
     )
     handler.setFormatter(formatter)
 
@@ -153,22 +158,30 @@ def setup_logging():
 # -------------- Event Jobs ----------------
 def heartbeat(sched):
     # Check health of schedulers
+    logger.debug("Hearbeat.")
+    heartbeatAlertLevel = 0
+    ## check application health
+    # check if date information iis available
+    logger.debug("Length of bin date dictionary: %d", len(sched.binSched.getBinDates()))
+    if len(sched.binSched.getBinDates()) == 0:
+        # no available date information
+        heartbeatAlertLevel = 1
+    # check job queue lengths
     scheulerQueueLength = len(sched.events)
     statusLEDqueueLength = len(sched.statusLED.jobs)
     binLEDqueueLength = len(sched.binLED.jobs)
+    logger.debug("Queue lengths: %d %d %d", scheulerQueueLength, statusLEDqueueLength, binLEDqueueLength)
     if (scheulerQueueLength <= 1 or 
         scheulerQueueLength > 10 or
         statusLEDqueueLength > 10 or
         binLEDqueueLength > 10):
         # job queue is either too empty or is filling up
-        # flash amber heartbeat
-        sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.heartbeat(led, (4,2,0)))
-    else:
-        # size of job queue is in expected bounds, flash green heartbeat
-        sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.heartbeat(led, (0,4,0)))
-    time.sleep(1)
-    sched.statusLED.remove_job("heartbeat")
+        heartbeatAlertLevel = 2
+    # call heartbeat LED pattern
+    logger.debug("Application alert level: %d", heartbeatAlertLevel)
+    sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.heartbeat(led, heartbeatAlertLevel))
     # reschedule itself
+    time.sleep(1)
     sched.schedule(datetime.now() + timedelta(seconds=10), heartbeat, sched)
 
 def soft_reset(sched):
@@ -190,7 +203,7 @@ class binSchedule: # class container for the web-scraper
     
     def web_scrape(self, sched):
         sched.statusLED.push_job("web_scrape", 10, lambda led: LEDpatterns.web_activity(led))
-        logger.info("Starting web scrape...")
+        logger.info("Starting web scrape.")
         try:
             with open("address.txt") as f:
                 source = scraper.scrape_bin_date_website(f.readline())
@@ -199,12 +212,12 @@ class binSchedule: # class container for the web-scraper
             logger.info("Successfully finished web scrape.")
             sched.statusLED.push_job("success", 20, lambda led: LEDpatterns.success(led))
             # reschedule scraping for 12pm
-            logger.info("Rescheduling for web scrape for next scheduled time")
+            logger.info("Rescheduling for web scrape for next scheduled time.")
             sched.schedule(next_schedule_time(web_scrape_schedule), sched.binSched.web_scrape, sched)
         except:
-            logger.error("Fatal error in scraper")
+            logger.error("Fatal error in scraper.")
             # reschedule for 10 minutes time
-            logger.info("Rescheduling web scrape for 10 minutes time")
+            logger.info("Rescheduling web scrape for 10 minutes time.")
             sched.schedule(datetime.now() + timedelta(minutes=10), sched.binSched.web_scrape, sched)
         sched.statusLED.remove_job("web_scrape")
     
@@ -216,7 +229,7 @@ class binSchedule: # class container for the web-scraper
         return self.date_information_int
 
 def show_next_bin(sched):
-    logger.info("Show next bin collection")
+    logger.info("Show next bin collection.")
     date_information = sched.binSched.getBinDates()
     if len(date_information) == 0:
         # if there's no bin information, show error on status LED
@@ -249,14 +262,14 @@ class binIndicatorController: # class container for the bin indicator LED contro
         self.bin_display_state = True
         self.update_bin_indicator(sched)
         time.sleep(10)
-        logger.info("Added scheduled ON time for Bin Indicator to scheduler")
+        logger.info("Added scheduled ON time for Bin Indicator to scheduler.")
         sched.schedule(next_schedule_time(start_bin_schedule), self.show_bin_indicator, sched)
 
     def hide_bin_indicator(self, sched):
         self.bin_schedule_state = False
         self.update_bin_indicator(sched)
         time.sleep(10)
-        logger.info("Added scheduled OFF time for Bin Indicator to scheduler")
+        logger.info("Added scheduled OFF time for Bin Indicator to scheduler.")
         sched.schedule(next_schedule_time(stop_bin_schedule), self.hide_bin_indicator, sched)
 
     def toggle_bin_display(self, sched):
@@ -266,15 +279,16 @@ class binIndicatorController: # class container for the bin indicator LED contro
     def update_bin_indicator(self, sched):
         if self.bin_display_state and self.bin_schedule_state:
             date_information = sched.binSched.getBinDates()
-            logger.info("Updating Bin Indicator illumination")
+            logger.info("Updating Bin Indicator illumination.")
             if len(date_information) == 0:
                 return
             today_int = datetime.now().date()
             for bin in bin_colours.keys():
                 if (date_information[bin] - today_int).days == 1:
+                    logger.debug("Bin name: %r, RGB assigned: %d, %d, %d", bin, bin_colours[bin][0], bin_colours[bin][1], bin_colours[bin][2])
                     sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[bin]))
         else:
-            logger.info("Turning off Bin Iindicator")
+            logger.info("Turning off Bin Iindicator.")
             sched.binLED.remove_job("scheduled_next_bin")
 
 # ------- Helper functions --------
@@ -315,29 +329,29 @@ def next_schedule_time(hour):
 
 def set_initial_jobs(sched):
     sched.schedule(datetime.now() + timedelta(seconds=1), heartbeat, sched)
-    logger.info("Added Heartbeat to scheduler")
+    logger.info("Added Heartbeat to scheduler.")
     sched.schedule(datetime.now() + timedelta(seconds=0.9), POST, sched)
-    logger.info("Added POST to scheduler")
+    logger.info("Added POST to scheduler.")
     sched.schedule(datetime.now() + timedelta(seconds=6), sched.binSched.web_scrape, sched)
-    logger.info("Added Web Scrape to scheduler")
+    logger.info("Added Web Scrape to scheduler.")
     sched.schedule(datetime.now() + timedelta(seconds=14), sched.binIndicator.update_bin_indicator, sched)
-    logger.info("Added Update Bin Indicator to scheduler")
+    logger.info("Added Update Bin Indicator to scheduler.")
 
     # Schedule bin indicator illumination
     sched.schedule(next_schedule_time(start_bin_schedule), sched.binIndicator.show_bin_indicator, sched)
-    logger.info("Added scheduled ON time for Bin Indicator to scheduler")
+    logger.info("Added scheduled ON time for Bin Indicator to scheduler.")
     sched.schedule(next_schedule_time(stop_bin_schedule), sched.binIndicator.hide_bin_indicator, sched)
-    logger.info("Added scheduled OFF time for Bin Indicator to scheduler")
+    logger.info("Added scheduled OFF time for Bin Indicator to scheduler.")
 
     # set default bin illumination (off)
     sched.binLED.push_job("defaultOff", 1, lambda led: LEDpatterns.turn_off(led))
-    logger.info("Added default OFF display to Bin Indicator LED to scheduler")
+    logger.info("Added default OFF display to Bin Indicator LED to scheduler.")
 
 # ---------------- Main ----------------
 if __name__ == "__main__":
     # configure logging
     setup_logging()
-    logger.info("Application launched")
+    logger.info("Application launched.")
 
     # --------------- Configure GPIO -------------------
     GPIO.setmode(GPIO.BCM) # BCM numbering
@@ -398,9 +412,9 @@ if __name__ == "__main__":
     GPIO.add_event_callback(BUTTON_PIN, touch_button_handler.edge_detected)
 
     try:
-        logger.info("Starting scheduler")
+        logger.info("Starting scheduler.")
         sched.run()
     except KeyboardInterrupt:
-        logger.info("Keyboard interrupt caught, closing application")
+        logger.info("Keyboard interrupt caught, closing application.")
         sched.stop()
         GPIO.cleanup()
