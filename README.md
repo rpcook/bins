@@ -37,8 +37,8 @@ Web scraper to determine next collection hosted on a Raspberry Pi. On the day be
 - ~~Robust watchdog etc~~
   - ~~Soft-reset function~~
 - ~~Catch maintenance mode on website~~
-- Logging
-  - Management of log size
+- ~~Logging~~
+  - ~~Management of log size~~
 - ~~Rainbow POST for bin~~
 - ~~Different user inputs~~
 
