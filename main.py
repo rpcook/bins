@@ -199,7 +199,7 @@ def soft_reset(sched):
 
 class binSchedule: # class container for the web-scraper
     def __init__(self):
-        self.date_information_int = []
+        self.date_information_int = {}
     
     def web_scrape(self, sched):
         sched.statusLED.push_job("web_scrape", 10, lambda led: LEDpatterns.web_activity(led))
@@ -209,6 +209,7 @@ class binSchedule: # class container for the web-scraper
                 source = scraper.scrape_bin_date_website(f.readline())
             date_information_dict = webparser.parse_bin_table_to_dict(source)
             self.date_information_int = webparser.parse_dates(date_information_dict)
+            del self.date_information_int["Brown caddy"] # remove the food waste caddy from dictionary
             logger.info("Successfully finished web scrape.")
             sched.statusLED.push_job("success", 20, lambda led: LEDpatterns.success(led))
             # reschedule scraping for 12pm
@@ -222,8 +223,10 @@ class binSchedule: # class container for the web-scraper
         sched.statusLED.remove_job("web_scrape")
     
     def getNextBin(self):
-        # TODO: return list of next bins (to handle corner case of two bins on same day)
-        pass
+        # return list of next bins (to handle corner case of two bins on same day)
+        today_int = datetime.now().date()
+        orderedBins = {k: (v-today_int).days for k, v in sorted(self.date_information_int.items(), key=lambda item: (item[1]-today_int).days)}
+        return orderedBins
 
     def getBinDates(self):
         return self.date_information_int
