@@ -137,14 +137,14 @@ def setup_logging():
     # LOG_LEVEL = logging.INFO
     handler = TimedRotatingFileHandler(
         filename=LOG_PATH + "bin.log",
-        when="M",              # rotate monthly
-        interval=1,            # every month
-        backupCount=6,         # keep 6 months
+        when="midnight",       # rotate daily
+        interval=1,
+        backupCount=180,         # keep ~6 months
         encoding="utf-8",
         utc=False
     )
 
-    handler.suffix = "%Y-%m"
+    handler.suffix = "%Y-%m-%d"
 
     formatter = logging.Formatter(
         "%(asctime)s %(levelname)s: %(message)s"
@@ -238,6 +238,7 @@ def show_next_bin(sched):
         # if there's no bin information, show error on status LED
         sched.statusLED.push_job("error", 50, lambda led: LEDpatterns.error(led))
         return
+    # TODO update to deal with corner case of two bins on same day
     today_int = datetime.now().date()
     next_bin_int = 100
     next_bin_key = []
@@ -286,6 +287,7 @@ class binIndicatorController: # class container for the bin indicator LED contro
             if len(date_information) == 0:
                 return
             today_int = datetime.now().date()
+            # TODO update to deal with corner case of two bins on same day
             for bin in bin_colours.keys():
                 if (date_information[bin] - today_int).days == 1:
                     logger.debug("Bin name: %r, RGB assigned: %d, %d, %d", bin, bin_colours[bin][0], bin_colours[bin][1], bin_colours[bin][2])
