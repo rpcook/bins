@@ -109,8 +109,8 @@ class Scheduler:
     def clearHeap(self):
         logger.debug("Scheduler clearing heap")
         with self.lock:
-            blankEventList = []
-            heapq.heapify(blankEventList)
+            for _ in range(len(self.events)):
+                heapq.heappop(self.events)
 
     def run(self):
         while self.running:
@@ -217,6 +217,7 @@ class binSchedule: # class container for the web-scraper
             sched.schedule(next_schedule_time(web_scrape_schedule), sched.binSched.web_scrape, sched)
         except:
             logger.error("Fatal error in scraper.")
+            sched.statusLED.push_job("error", 40, lambda led: LEDpatterns.error(led))
             # reschedule for 10 minutes time
             logger.info("Rescheduling web scrape for 10 minutes time.")
             sched.schedule(datetime.now() + timedelta(minutes=10), sched.binSched.web_scrape, sched)
