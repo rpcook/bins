@@ -123,10 +123,10 @@ class Scheduler:
 
             if job:
                 _, func, args, kwargs = job
+                logger.debug("Scheduler launching job.")
                 threading.Thread(
                     target=func, args=args, kwargs=kwargs, daemon=True
                 ).start()
-                logger.debug("Scheduler launching job.")
             else:
                 time.sleep(0.5)
 
@@ -239,21 +239,26 @@ def show_next_bin(sched):
         # if there's no bin information, show error on status LED
         sched.statusLED.push_job("error", 50, lambda led: LEDpatterns.error(led))
         return
-    # TODO update to deal with corner case of two bins on same day
-    today_int = datetime.now().date()
-    next_bin_int = 100
-    next_bin_key = []
-    for bin in bin_colours.keys():
-        if (date_information[bin] - today_int).days < next_bin_int and (date_information[bin] - today_int).days > 0:
-            # loop over dictionary of bin dates and collect next closest
-            next_bin_int = (date_information[bin] - today_int).days
-            next_bin_key = bin
-    # call next bin indicator function (solid for 1s, then flash according to number of days until collection)
-    sched.binLED.push_job("user_request_next_bin", 50, lambda led: LEDpatterns.next_bin(led, bin_colours[next_bin_key], next_bin_int))
+    orderedBinDict = sched.binSched.getNextBin()
+    keyList = list(orderedBinDict)
+    if orderedBinDict[keyList[0]] == orderedBinDict[keyList[1]]:
+        # if the first two bins fall on the same day
+        logger.info("Two bins falling on same day.")
+        logger.info("Next bin is %r, in %d day(s).", keyList[1], orderedBinDict[keyList[1]])
+        # display the second bin colour for 2s, 0.5s off
+        sched.binLED.push_job("second_bin", 50, lambda led: LEDpatterns.solid_colour(led, bin_colours[keyList[1]]))
+        time.sleep(2)
+        sched.binLED.remove_job("second_bin")
+        time.sleep(0.5)
+    # display the first bin using the standard pattern of solid then flash
+    logger.info("Next bin is %r in %d day(s).", keyList[0], orderedBinDict[keyList[0]])
+    sched.binLED.push_job("user_request_next_bin", 50, lambda led: LEDpatterns.next_bin(led, bin_colours[keyList[0]], orderedBinDict[keyList[0]]))
 
 class binIndicatorController: # class container for the bin indicator LED controller functions
     def __init__(self):
         self.reset()
+        self.secondBinSameDayDisplay = False
+        self.secondBinSameDayLogged = False
 
     def reset(self):
         self.bin_display_state = True
@@ -263,14 +268,17 @@ class binIndicatorController: # class container for the bin indicator LED contro
             self.bin_schedule_state = False
 
     def show_bin_indicator(self, sched):
+        logger.info("Scheduled start time for display.")
         self.bin_schedule_state = True
         self.bin_display_state = True
+        self.secondBinSameDayLogged = False
         self.update_bin_indicator(sched)
         time.sleep(10)
         logger.info("Added scheduled ON time for Bin Indicator to scheduler.")
         sched.schedule(next_schedule_time(start_bin_schedule), self.show_bin_indicator, sched)
 
     def hide_bin_indicator(self, sched):
+        logger.info("Scheduled stop time for display")
         self.bin_schedule_state = False
         self.update_bin_indicator(sched)
         time.sleep(10)
@@ -283,18 +291,39 @@ class binIndicatorController: # class container for the bin indicator LED contro
 
     def update_bin_indicator(self, sched):
         if self.bin_display_state and self.bin_schedule_state:
+            # if we're in the display time window and the display hasn't been disabled by user input
             date_information = sched.binSched.getBinDates()
-            logger.info("Updating Bin Indicator illumination.")
             if len(date_information) == 0:
+                # cancel display update if no date information available
                 return
-            today_int = datetime.now().date()
-            # TODO update to deal with corner case of two bins on same day
-            for bin in bin_colours.keys():
-                if (date_information[bin] - today_int).days == 1:
-                    logger.debug("Bin name: %r, RGB assigned: %d, %d, %d", bin, bin_colours[bin][0], bin_colours[bin][1], bin_colours[bin][2])
-                    sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[bin]))
+            
+            orderedBinDict = sched.binSched.getNextBin()
+            keyList = list(orderedBinDict)
+            if (orderedBinDict[keyList[0]] == orderedBinDict[keyList[1]]) and (orderedBinDict[keyList[0]] == 1):
+                # if there are two bins on same day
+                if not self.secondBinSameDayLogged:
+                    logger.info("Two bins on same day. Toggling between bins every 10s.")
+                    logger.info("Bin name: %r, RGB assigned: %d, %d, %d", keyList[0], bin_colours[keyList[0]][0], bin_colours[keyList[0]][1], bin_colours[keyList[0]][2])
+                    logger.info("Bin name: %r, RGB assigned: %d, %d, %d", keyList[1], bin_colours[keyList[1]][0], bin_colours[keyList[1]][1], bin_colours[keyList[1]][2])
+                    self.secondBinSameDayLogged = True
+                try:
+                    # remove the previous bin display to stop job queue growing uncontrollably
+                    sched.binLED.remove_job("scheduled_next_bin")
+                finally:
+                    # update the bin indicator LED
+                    sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[keyList[0 if self.secondBinSameDayDisplay else 1]]))
+                    # toggle the second bin display flag
+                    self.secondBinSameDayDisplay = not self.secondBinSameDayDisplay
+                    # reschedule this job for 10s time
+                    sched.schedule(datetime.now() + timedelta(seconds=10), sched.binIndicator.update_bin_indicator, sched)
+            elif (orderedBinDict[keyList[0]] == 1):
+                sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[keyList[0]]))
+                logger.info("Updating Bin Indicator illumination.")
+                logger.info("Bin name: %r, RGB assigned: %d, %d, %d", keyList[0], bin_colours[keyList[0]][0], bin_colours[keyList[0]][1], bin_colours[keyList[0]][2])
+            else:
+                logger.info("No bin due tomorrow.")
         else:
-            logger.info("Turning off Bin Iindicator.")
+            logger.info("Turning off Bin Indicator.")
             sched.binLED.remove_job("scheduled_next_bin")
 
 # ------- Helper functions --------
