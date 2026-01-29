@@ -133,8 +133,8 @@ class Scheduler:
 # ---------------- Logging ----------------
 logger = logging.getLogger(__name__)
 def setup_logging():
-    LOG_LEVEL = logging.DEBUG
-    # LOG_LEVEL = logging.INFO
+    # LOG_LEVEL = logging.DEBUG
+    LOG_LEVEL = logging.INFO
     handler = TimedRotatingFileHandler(
         filename=LOG_PATH + "bin.log",
         when="midnight",       # rotate daily
@@ -274,7 +274,7 @@ class binIndicatorController: # class container for the bin indicator LED contro
         self.secondBinSameDayLogged = False
         self.update_bin_indicator(sched)
         time.sleep(10)
-        logger.info("Added scheduled ON time for Bin Indicator to scheduler.")
+        logger.info("Added scheduled ON time for Bin Indicator to scheduler (%d00).", start_bin_schedule)
         sched.schedule(next_schedule_time(start_bin_schedule), self.show_bin_indicator, sched)
 
     def hide_bin_indicator(self, sched):
@@ -282,7 +282,7 @@ class binIndicatorController: # class container for the bin indicator LED contro
         self.bin_schedule_state = False
         self.update_bin_indicator(sched)
         time.sleep(10)
-        logger.info("Added scheduled OFF time for Bin Indicator to scheduler.")
+        logger.info("Added scheduled OFF time for Bin Indicator to scheduler (%d00).", stop_bin_schedule)
         sched.schedule(next_schedule_time(stop_bin_schedule), self.hide_bin_indicator, sched)
 
     def toggle_bin_display(self, sched):
@@ -374,9 +374,9 @@ def set_initial_jobs(sched):
 
     # Schedule bin indicator illumination
     sched.schedule(next_schedule_time(start_bin_schedule), sched.binIndicator.show_bin_indicator, sched)
-    logger.info("Added scheduled ON time for Bin Indicator to scheduler.")
+    logger.info("Added scheduled ON time for Bin Indicator to scheduler (%d00).", start_bin_schedule)
     sched.schedule(next_schedule_time(stop_bin_schedule), sched.binIndicator.hide_bin_indicator, sched)
-    logger.info("Added scheduled OFF time for Bin Indicator to scheduler.")
+    logger.info("Added scheduled OFF time for Bin Indicator to scheduler (%d00).", stop_bin_schedule)
 
     # set default bin illumination (off)
     sched.binLED.push_job("defaultOff", 1, lambda led: LEDpatterns.turn_off(led))
