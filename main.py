@@ -213,7 +213,7 @@ class binSchedule: # class container for the web-scraper
             logger.info("Successfully finished web scrape.")
             sched.statusLED.push_job("success", 20, lambda led: LEDpatterns.success(led))
             # reschedule scraping for 12pm
-            logger.info("Rescheduling for web scrape for next scheduled time.")
+            logger.info("Rescheduling for web scrape for next scheduled time (%d00).", web_scrape_schedule)
             sched.schedule(next_schedule_time(web_scrape_schedule), sched.binSched.web_scrape, sched)
         except:
             logger.error("Fatal error in scraper.")
