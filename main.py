@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import tomllib
 import logging
 from logging.handlers import TimedRotatingFileHandler
+import os
 
 # ---- GPIO library with mock for PC development ----
 try:
@@ -166,10 +167,19 @@ class Chest:
     # class that contains the heartbeat
     def __init__(self):
         self.heartbeatAlertLevel = 0
+        self.longDebug = False
 
     def heartbeat(self, sched):
         # Check health of schedulers
         logger.debug("Hearbeat.")
+        # check for filesystem trigger for debug mode
+        if os.path.exists("~/logs/debug"):
+            self.longDebug = True
+            os.remove("~/logs/debug")
+            logging.getLogger().setLevel(logging.DEBUG)
+            logger.debug("Entering debug logging from filesystem trigger.")
+            sched.schedule(datetime.now() + timedelta(minutes=LONG_TIMEOUT), revertLoggingLevel, sched)
+
         oldAlertLevel = self.heartbeatAlertLevel
         self.heartbeatAlertLevel = 0
         ## check application health
@@ -192,7 +202,7 @@ class Chest:
         # call heartbeat LED pattern
         logger.debug("Application alert level: %d", self.heartbeatAlertLevel)
         sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.heartbeat(led, self.heartbeatAlertLevel))
-        if self.heartbeatAlertLevel > oldAlertLevel:
+        if (self.heartbeatAlertLevel > oldAlertLevel) and not (self.longDebug):
             # alert level has increased, set logger level to debug for short period of time.
             logger.warning("System Alert Level has increased to Level %d, entering debug logging for short period.", self.heartbeatAlertLevel)
             logging.getLogger().setLevel(logging.DEBUG)
@@ -345,6 +355,7 @@ class binIndicatorController: # class container for the bin indicator LED contro
 
 # ------- Helper functions --------
 def revertLoggingLevel():
+    chest.longDebug = False
     logging.getLogger().setLevel(logging.INFO)
 
 def POST(sched):
