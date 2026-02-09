@@ -26,11 +26,15 @@ import LEDpatterns
 with open("config.toml", "rb") as f:
     config = tomllib.load(f)
 
-start_bin_schedule = config["display_on"]
-stop_bin_schedule = config["display_off"]
-web_scrape_schedule = config["poll_web"]
+START_BIN_SCHEDULE = config["display_on"]
+STOP_BIN_SCHEDULE = config["display_off"]
+WEB_SCRAPE_SCHEDULE = config["poll_web"]
 
-bin_colours = {k: tuple(v) for k, v in config["bin_colours"].items()}
+BIN_COLOURS = {k: tuple(v) for k, v in config["bin_colours"].items()}
+
+SHORT_TIMEOUT = config["short_timeout"]
+LONG_TIMEOUT = config["long_timeout"]
+
 #TODO: debug elevation:
 #  - extra-long press to enable debug for TIMEOUT
 #  - entering alert (error) state enables debug for SHORTTIMEOUT
@@ -136,7 +140,6 @@ class Scheduler:
 # ---------------- Logging ----------------
 logger = logging.getLogger(__name__)
 def setup_logging():
-    # LOG_LEVEL = logging.DEBUG
     LOG_LEVEL = logging.INFO
     handler = TimedRotatingFileHandler(
         filename=LOG_PATH + "bin.log",
@@ -191,7 +194,9 @@ class Chest:
         sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.heartbeat(led, self.heartbeatAlertLevel))
         if self.heartbeatAlertLevel > oldAlertLevel:
             # alert level has increased, set logger level to debug for short period of time.
-            pass
+            logger.warning("System Alert Level has increased to Level %d, entering debug logging for short period.", self.heartbeatAlertLevel)
+            logging.getLogger().setLevel(logging.DEBUG)
+            sched.schedule(datetime.now() + timedelta(minutes=SHORT_TIMEOUT), revertLoggingLevel, sched)
         # reschedule itself
         time.sleep(1)
         sched.schedule(datetime.now() + timedelta(seconds=10), self.heartbeat, sched)
@@ -225,14 +230,14 @@ class binSchedule: # class container for the web-scraper
             logger.info("Successfully finished web scrape.")
             sched.statusLED.push_job("success", 20, lambda led: LEDpatterns.success(led))
             # reschedule scraping for 12pm
-            logger.info("Rescheduling for web scrape for next scheduled time (%d00).", web_scrape_schedule)
-            sched.schedule(next_schedule_time(web_scrape_schedule), sched.binSched.web_scrape, sched)
+            logger.info("Rescheduling for web scrape for next scheduled time (%d00).", WEB_SCRAPE_SCHEDULE)
+            sched.schedule(next_schedule_time(WEB_SCRAPE_SCHEDULE), sched.binSched.web_scrape, sched)
         except:
             logger.error("Fatal error in scraper.")
             sched.statusLED.push_job("error", 40, lambda led: LEDpatterns.error(led))
             # reschedule for 10 minutes time
-            logger.info("Rescheduling web scrape for 10 minutes time.")
-            sched.schedule(datetime.now() + timedelta(minutes=10), sched.binSched.web_scrape, sched)
+            logger.info("Rescheduling web scrape for 30 minutes time.")
+            sched.schedule(datetime.now() + timedelta(minutes=30), sched.binSched.web_scrape, sched)
         sched.statusLED.remove_job("web_scrape")
     
     def getNextBin(self):
@@ -258,13 +263,13 @@ def show_next_bin(sched):
         logger.info("Two bins falling on same day.")
         logger.info("Next bin is %r, in %d day(s).", keyList[1], orderedBinDict[keyList[1]])
         # display the second bin colour for 2s, 0.5s off
-        sched.binLED.push_job("second_bin", 50, lambda led: LEDpatterns.solid_colour(led, bin_colours[keyList[1]]))
+        sched.binLED.push_job("second_bin", 50, lambda led: LEDpatterns.solid_colour(led, BIN_COLOURS[keyList[1]]))
         time.sleep(2)
         sched.binLED.remove_job("second_bin")
         time.sleep(0.5)
     # display the first bin using the standard pattern of solid then flash
     logger.info("Next bin is %r in %d day(s).", keyList[0], orderedBinDict[keyList[0]])
-    sched.binLED.push_job("user_request_next_bin", 50, lambda led: LEDpatterns.next_bin(led, bin_colours[keyList[0]], orderedBinDict[keyList[0]]))
+    sched.binLED.push_job("user_request_next_bin", 50, lambda led: LEDpatterns.next_bin(led, BIN_COLOURS[keyList[0]], orderedBinDict[keyList[0]]))
 
 class binIndicatorController: # class container for the bin indicator LED controller functions
     def __init__(self):
@@ -274,7 +279,7 @@ class binIndicatorController: # class container for the bin indicator LED contro
 
     def reset(self):
         self.bin_display_state = True
-        if datetime.now().hour >= start_bin_schedule and datetime.now().hour < stop_bin_schedule:
+        if datetime.now().hour >= START_BIN_SCHEDULE and datetime.now().hour < STOP_BIN_SCHEDULE:
             self.bin_schedule_state = True
         else:
             self.bin_schedule_state = False
@@ -286,16 +291,16 @@ class binIndicatorController: # class container for the bin indicator LED contro
         self.secondBinSameDayLogged = False
         self.update_bin_indicator(sched)
         time.sleep(10)
-        logger.info("Added scheduled ON time for Bin Indicator to scheduler (%d00).", start_bin_schedule)
-        sched.schedule(next_schedule_time(start_bin_schedule), self.show_bin_indicator, sched)
+        logger.info("Added scheduled ON time for Bin Indicator to scheduler (%d00).", START_BIN_SCHEDULE)
+        sched.schedule(next_schedule_time(START_BIN_SCHEDULE), self.show_bin_indicator, sched)
 
     def hide_bin_indicator(self, sched):
         logger.info("Scheduled stop time for display")
         self.bin_schedule_state = False
         self.update_bin_indicator(sched)
         time.sleep(10)
-        logger.info("Added scheduled OFF time for Bin Indicator to scheduler (%d00).", stop_bin_schedule)
-        sched.schedule(next_schedule_time(stop_bin_schedule), self.hide_bin_indicator, sched)
+        logger.info("Added scheduled OFF time for Bin Indicator to scheduler (%d00).", STOP_BIN_SCHEDULE)
+        sched.schedule(next_schedule_time(STOP_BIN_SCHEDULE), self.hide_bin_indicator, sched)
 
     def toggle_bin_display(self, sched):
         self.bin_display_state = not self.bin_display_state
@@ -315,23 +320,23 @@ class binIndicatorController: # class container for the bin indicator LED contro
                 # if there are two bins on same day
                 if not self.secondBinSameDayLogged:
                     logger.info("Two bins on same day. Toggling between bins every 10s.")
-                    logger.info("Bin name: %r, RGB assigned: %d, %d, %d", keyList[0], bin_colours[keyList[0]][0], bin_colours[keyList[0]][1], bin_colours[keyList[0]][2])
-                    logger.info("Bin name: %r, RGB assigned: %d, %d, %d", keyList[1], bin_colours[keyList[1]][0], bin_colours[keyList[1]][1], bin_colours[keyList[1]][2])
+                    logger.info("Bin name: %r, RGB assigned: %d, %d, %d", keyList[0], BIN_COLOURS[keyList[0]][0], BIN_COLOURS[keyList[0]][1], BIN_COLOURS[keyList[0]][2])
+                    logger.info("Bin name: %r, RGB assigned: %d, %d, %d", keyList[1], BIN_COLOURS[keyList[1]][0], BIN_COLOURS[keyList[1]][1], BIN_COLOURS[keyList[1]][2])
                     self.secondBinSameDayLogged = True
                 try:
                     # remove the previous bin display to stop job queue growing uncontrollably
                     sched.binLED.remove_job("scheduled_next_bin")
                 finally:
                     # update the bin indicator LED
-                    sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[keyList[0 if self.secondBinSameDayDisplay else 1]]))
+                    sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, BIN_COLOURS[keyList[0 if self.secondBinSameDayDisplay else 1]]))
                     # toggle the second bin display flag
                     self.secondBinSameDayDisplay = not self.secondBinSameDayDisplay
                     # reschedule this job for 10s time
                     sched.schedule(datetime.now() + timedelta(seconds=10), sched.binIndicator.update_bin_indicator, sched)
             elif (orderedBinDict[keyList[0]] == 1):
-                sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, bin_colours[keyList[0]]))
+                sched.binLED.push_job("scheduled_next_bin", 5, lambda led: LEDpatterns.solid_colour(led, BIN_COLOURS[keyList[0]]))
                 logger.info("Updating Bin Indicator illumination.")
-                logger.info("Bin name: %r, RGB assigned: %d, %d, %d", keyList[0], bin_colours[keyList[0]][0], bin_colours[keyList[0]][1], bin_colours[keyList[0]][2])
+                logger.info("Bin name: %r, RGB assigned: %d, %d, %d", keyList[0], BIN_COLOURS[keyList[0]][0], BIN_COLOURS[keyList[0]][1], BIN_COLOURS[keyList[0]][2])
             else:
                 logger.info("No bin due tomorrow.")
         else:
@@ -339,6 +344,9 @@ class binIndicatorController: # class container for the bin indicator LED contro
             sched.binLED.remove_job("scheduled_next_bin")
 
 # ------- Helper functions --------
+def revertLoggingLevel():
+    logging.getLogger().setLevel(logging.INFO)
+
 def POST(sched):
     for h in range(180, 481+360, 2):
         RGB = HSVtoRGB(h, 1, 1)
@@ -385,10 +393,10 @@ def set_initial_jobs(sched):
     logger.info("Added Update Bin Indicator to scheduler.")
 
     # Schedule bin indicator illumination
-    sched.schedule(next_schedule_time(start_bin_schedule), sched.binIndicator.show_bin_indicator, sched)
-    logger.info("Added scheduled ON time for Bin Indicator to scheduler (%d00).", start_bin_schedule)
-    sched.schedule(next_schedule_time(stop_bin_schedule), sched.binIndicator.hide_bin_indicator, sched)
-    logger.info("Added scheduled OFF time for Bin Indicator to scheduler (%d00).", stop_bin_schedule)
+    sched.schedule(next_schedule_time(START_BIN_SCHEDULE), sched.binIndicator.show_bin_indicator, sched)
+    logger.info("Added scheduled ON time for Bin Indicator to scheduler (%d00).", START_BIN_SCHEDULE)
+    sched.schedule(next_schedule_time(STOP_BIN_SCHEDULE), sched.binIndicator.hide_bin_indicator, sched)
+    logger.info("Added scheduled OFF time for Bin Indicator to scheduler (%d00).", STOP_BIN_SCHEDULE)
 
     # set default bin illumination (off)
     sched.binLED.push_job("defaultOff", 1, lambda led: LEDpatterns.turn_off(led))

@@ -13,3 +13,9 @@ black  = [100,100,100]
 brown  = [100, 38,  0]
 blue   = [  0,  0,100]
 purple = [100,  0,100]
+
+## Debug mode configuration
+# Debug duration when entering higher alert level (automated), minutes
+short_timeout = 1
+# debug duration when commanded via button press / filesystem trigger
+long_timeout = 10
