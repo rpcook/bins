@@ -31,7 +31,10 @@ stop_bin_schedule = config["display_off"]
 web_scrape_schedule = config["poll_web"]
 
 bin_colours = {k: tuple(v) for k, v in config["bin_colours"].items()}
-
+#TODO: debug elevation:
+#  - extra-long press to enable debug for TIMEOUT
+#  - entering alert (error) state enables debug for SHORTTIMEOUT
+#  - poll in heartbeat for presence of file in some tempfs folder, then enable debug for TIMEOUT, delete the temp trigger file
 # ---------- User input control class ---------------
 class button_handler:
     def __init__(self, PIN, single_fun=None, double_fun=None, long_fun=None, DOUBLE_TAP_TIME=0.3, LONG_HOLD_TIME=0.5):
@@ -156,33 +159,42 @@ def setup_logging():
     root.addHandler(handler)
 
 # -------------- Event Jobs ----------------
-def heartbeat(sched):
-    # Check health of schedulers
-    logger.debug("Hearbeat.")
-    heartbeatAlertLevel = 0
-    ## check application health
-    # check if date information iis available
-    logger.debug("Length of bin date dictionary: %d", len(sched.binSched.getBinDates()))
-    if len(sched.binSched.getBinDates()) == 0:
-        # no available date information
-        heartbeatAlertLevel = 1
-    # check job queue lengths
-    scheulerQueueLength = len(sched.events)
-    statusLEDqueueLength = len(sched.statusLED.jobs)
-    binLEDqueueLength = len(sched.binLED.jobs)
-    logger.debug("Queue lengths: %d %d %d", scheulerQueueLength, statusLEDqueueLength, binLEDqueueLength)
-    if (scheulerQueueLength <= 1 or 
-        scheulerQueueLength > 10 or
-        statusLEDqueueLength > 10 or
-        binLEDqueueLength > 10):
-        # job queue is either too empty or is filling up
-        heartbeatAlertLevel = 2
-    # call heartbeat LED pattern
-    logger.debug("Application alert level: %d", heartbeatAlertLevel)
-    sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.heartbeat(led, heartbeatAlertLevel))
-    # reschedule itself
-    time.sleep(1)
-    sched.schedule(datetime.now() + timedelta(seconds=10), heartbeat, sched)
+class Chest: 
+    # class that contains the heartbeat
+    def __init__(self):
+        self.heartbeatAlertLevel = 0
+
+    def heartbeat(self, sched):
+        # Check health of schedulers
+        logger.debug("Hearbeat.")
+        oldAlertLevel = self.heartbeatAlertLevel
+        self.heartbeatAlertLevel = 0
+        ## check application health
+        # check if date information is available
+        logger.debug("Length of bin date dictionary: %d", len(sched.binSched.getBinDates()))
+        if len(sched.binSched.getBinDates()) == 0:
+            # no available date information
+            self.heartbeatAlertLevel = 1
+        # check job queue lengths
+        scheulerQueueLength = len(sched.events)
+        statusLEDqueueLength = len(sched.statusLED.jobs)
+        binLEDqueueLength = len(sched.binLED.jobs)
+        logger.debug("Queue lengths: %d %d %d", scheulerQueueLength, statusLEDqueueLength, binLEDqueueLength)
+        if (scheulerQueueLength <= 1 or 
+            scheulerQueueLength > 10 or
+            statusLEDqueueLength > 10 or
+            binLEDqueueLength > 10):
+            # job queue is either too empty or is filling up
+            self.heartbeatAlertLevel = 2
+        # call heartbeat LED pattern
+        logger.debug("Application alert level: %d", self.heartbeatAlertLevel)
+        sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.heartbeat(led, self.heartbeatAlertLevel))
+        if self.heartbeatAlertLevel > oldAlertLevel:
+            # alert level has increased, set logger level to debug for short period of time.
+            pass
+        # reschedule itself
+        time.sleep(1)
+        sched.schedule(datetime.now() + timedelta(seconds=10), self.heartbeat, sched)
 
 def soft_reset(sched):
     logger.info("Soft reset.")
@@ -363,7 +375,7 @@ def next_schedule_time(hour):
     return run_at
 
 def set_initial_jobs(sched):
-    sched.schedule(datetime.now() + timedelta(seconds=1), heartbeat, sched)
+    sched.schedule(datetime.now() + timedelta(seconds=1), chest.heartbeat, sched)
     logger.info("Added Heartbeat to scheduler.")
     sched.schedule(datetime.now() + timedelta(seconds=0.9), POST, sched)
     logger.info("Added POST to scheduler.")
@@ -435,6 +447,7 @@ if __name__ == "__main__":
     sched = Scheduler(status_led, bin_led, binSched, binIndicator)
 
     # Kick off initial jobs
+    chest = Chest()
     set_initial_jobs(sched)
 
     # button listener
