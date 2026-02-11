@@ -25,33 +25,34 @@ import LEDpatterns
 
 # ------------- Configuration variables --------------
 with open("config.toml", "rb") as f:
-    config = tomllib.load(f)
+    CONFIG = tomllib.load(f)
 
-START_BIN_SCHEDULE = config["display_on"]
-STOP_BIN_SCHEDULE = config["display_off"]
-WEB_SCRAPE_SCHEDULE = config["poll_web"]
+START_BIN_SCHEDULE = CONFIG["display_on"]
+STOP_BIN_SCHEDULE = CONFIG["display_off"]
+WEB_SCRAPE_SCHEDULE = CONFIG["poll_web"]
 
-BIN_COLOURS = {k: tuple(v) for k, v in config["bin_colours"].items()}
+BIN_COLOURS = {k: tuple(v) for k, v in CONFIG["bin_colours"].items()}
 
-SHORT_TIMEOUT = config["short_timeout"]
-LONG_TIMEOUT = config["long_timeout"]
+SHORT_TIMEOUT = CONFIG["short_timeout"]
+LONG_TIMEOUT = CONFIG["long_timeout"]
 
 #TODO: debug elevation:
 #  - extra-long press to enable debug for TIMEOUT
 #  - entering alert (error) state enables debug for SHORTTIMEOUT
 #  - poll in heartbeat for presence of file in some tempfs folder, then enable debug for TIMEOUT, delete the temp trigger file
 # ---------- User input control class ---------------
-class button_handler:
-    def __init__(self, PIN, single_fun=None, double_fun=None, long_fun=None, DOUBLE_TAP_TIME=0.3, LONG_HOLD_TIME=0.5):
+class ButtonHandler:
+    def __init__(self, PIN, single_fun=None, double_fun=None, long_fun=None, extra_long_fun=None, DOUBLE_TAP_TIME=0.3, LONG_HOLD_TIME=0.5, EXTRA_LONG_HOLD_TIME=1.5):
         self.PIN = PIN
         self.DOUBLE_TAP_TIME = DOUBLE_TAP_TIME
         self.LONG_HOLD_TIME = LONG_HOLD_TIME
+        self.EXTRA_LONG_HOLD_TIME = EXTRA_LONG_HOLD_TIME
         self.last_press_time = 0
-        self.press_time_start = 0
         self.single_timer = None
         self.single_handler = single_fun
         self.double_handler = double_fun
         self.long_handler = long_fun
+        self.extra_long_handler = extra_long_fun
 
     def edge_detected(self, channel):
         if GPIO.input(channel) == GPIO.HIGH:
@@ -90,9 +91,18 @@ class button_handler:
     def check_hold(self, start_time):
         # if button still held after LONG_HOLD_TIME, it's a long hold
         if GPIO.input(self.PIN) == GPIO.HIGH and self.press_start_time == start_time:
-            if self.long_handler:
-                logger.info("Long press.")
-                self.long_handler()
+            while GPIO.input(self.PIN) == GPIO.HIGH:
+                # hold program in loop while button held
+                time.sleep(0.01)
+            release_time = time.monotonic()
+            if release_time - self.last_press_time > self.EXTRA_LONG_HOLD_TIME:
+                if self.extra_long_handler:
+                    logger.info("Extra long press.")
+                    self.extra_long_handler()
+            else:
+                if self.long_handler:
+                    logger.info("Long press.")
+                    self.long_handler()
 
 # -------------- Scheduler class---------------------
 class Scheduler:
@@ -210,6 +220,12 @@ class Chest:
         # reschedule itself
         time.sleep(1)
         sched.schedule(datetime.now() + timedelta(seconds=10), self.heartbeat, sched)
+
+def manual_debug_logging(sched):
+    # TODO: somehow stop this getting cancelled by the heartbeat alert
+    logging.getLogger().setLevel(logging.DEBUG)
+    logger.debug("Entering debug logging from uesr button trigger.")
+    sched.schedule(datetime.now() + timedelta(minutes=LONG_TIMEOUT), revertLoggingLevel, sched)
 
 def soft_reset(sched):
     logger.info("Soft reset.")
@@ -472,10 +488,11 @@ if __name__ == "__main__":
     # button listener
     # Set up event detection for rising / falling edges
     GPIO.add_event_detect(BUTTON_PIN, GPIO.BOTH, bouncetime=10)
-    touch_button_handler = button_handler(PIN=BUTTON_PIN,
+    touch_button_handler = ButtonHandler(PIN=BUTTON_PIN,
                                           single_fun=lambda: binIndicator.toggle_bin_display(sched),
                                           double_fun=lambda: show_next_bin(sched),
-                                          long_fun=lambda: soft_reset(sched))
+                                          long_fun=lambda: soft_reset(sched),
+                                          extra_long_fun=lambda: manual_debug_logging(sched))
     GPIO.add_event_callback(BUTTON_PIN, touch_button_handler.edge_detected)
 
     try:
