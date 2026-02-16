@@ -36,10 +36,6 @@ BIN_COLOURS = {k: tuple(v) for k, v in CONFIG["bin_colours"].items()}
 SHORT_TIMEOUT = CONFIG["short_timeout"]
 LONG_TIMEOUT = CONFIG["long_timeout"]
 
-#TODO: debug elevation:
-#  - extra-long press to enable debug for TIMEOUT
-#  - entering alert (error) state enables debug for SHORTTIMEOUT
-#  - poll in heartbeat for presence of file in some tempfs folder, then enable debug for TIMEOUT, delete the temp trigger file
 # ---------- User input control class ---------------
 class ButtonHandler:
     def __init__(self, PIN, single_fun=None, double_fun=None, long_fun=None, extra_long_fun=None, DOUBLE_TAP_TIME=0.3, LONG_HOLD_TIME=0.5, EXTRA_LONG_HOLD_TIME=1.5):
@@ -177,18 +173,16 @@ class Chest:
     # class that contains the heartbeat
     def __init__(self):
         self.heartbeatAlertLevel = 0
-        self.longDebug = False
-
+        
     def heartbeat(self, sched):
         # Check health of schedulers
         logger.debug("Hearbeat.")
         # check for filesystem trigger for debug mode
         if os.path.exists("~/logs/debug"):
-            self.longDebug = True
             os.remove("~/logs/debug")
             logging.getLogger().setLevel(logging.DEBUG)
             logger.debug("Entering debug logging from filesystem trigger.")
-            sched.schedule(datetime.now() + timedelta(minutes=LONG_TIMEOUT), revertLoggingLevel, sched)
+            sched.schedule(datetime.now() + timedelta(minutes=LONG_TIMEOUT), revertLoggingLevel)
 
         oldAlertLevel = self.heartbeatAlertLevel
         self.heartbeatAlertLevel = 0
@@ -212,20 +206,19 @@ class Chest:
         # call heartbeat LED pattern
         logger.debug("Application alert level: %d", self.heartbeatAlertLevel)
         sched.statusLED.push_job("heartbeat", 1, lambda led: LEDpatterns.heartbeat(led, self.heartbeatAlertLevel))
-        if (self.heartbeatAlertLevel > oldAlertLevel) and not (self.longDebug):
-            # alert level has increased, set logger level to debug for short period of time.
+        if (self.heartbeatAlertLevel > oldAlertLevel) and (logging.getLogger().getEffectiveLevel() == logging.INFO):
+            # if we are now in a new alert state AND we were not in DEBUG logging level
             logger.warning("System Alert Level has increased to Level %d, entering debug logging for short period.", self.heartbeatAlertLevel)
             logging.getLogger().setLevel(logging.DEBUG)
-            sched.schedule(datetime.now() + timedelta(minutes=SHORT_TIMEOUT), revertLoggingLevel, sched)
+            sched.schedule(datetime.now() + timedelta(minutes=SHORT_TIMEOUT), revertLoggingLevel)
         # reschedule itself
         time.sleep(1)
         sched.schedule(datetime.now() + timedelta(seconds=10), self.heartbeat, sched)
 
 def manual_debug_logging(sched):
-    # TODO: somehow stop this getting cancelled by the heartbeat alert
     logging.getLogger().setLevel(logging.DEBUG)
-    logger.debug("Entering debug logging from uesr button trigger.")
-    sched.schedule(datetime.now() + timedelta(minutes=LONG_TIMEOUT), revertLoggingLevel, sched)
+    logger.debug("Entering debug logging from user button trigger.")
+    sched.schedule(datetime.now() + timedelta(minutes=LONG_TIMEOUT), revertLoggingLevel)
 
 def soft_reset(sched):
     logger.info("Soft reset.")
@@ -371,7 +364,7 @@ class binIndicatorController: # class container for the bin indicator LED contro
 
 # ------- Helper functions --------
 def revertLoggingLevel():
-    chest.longDebug = False
+    logger.info("Returning to INFO logging level.")
     logging.getLogger().setLevel(logging.INFO)
 
 def POST(sched):
