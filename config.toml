@@ -6,6 +6,12 @@ display_off = 23
 # when to poll the web for new bin information
 poll_web = 12
 
+## Debug mode configuration
+# Debug duration when entering higher alert level (automated), minutes
+short_timeout = 1
+# debug duration when commanded via button press / filesystem trigger
+long_timeout = 10
+
 ## RGB colour value for bindicator to display
 # RGB range 0-100
 [bin_colours]
@@ -13,9 +19,3 @@ black  = [100,100,100]
 brown  = [100, 38,  0]
 blue   = [  0,  0,100]
 purple = [100,  0,100]
-
-## Debug mode configuration
-# Debug duration when entering higher alert level (automated), minutes
-short_timeout = 1
-# debug duration when commanded via button press / filesystem trigger
-long_timeout = 10
