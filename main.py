@@ -178,8 +178,8 @@ class Chest:
         # Check health of schedulers
         logger.debug("Hearbeat.")
         # check for filesystem trigger for debug mode
-        if os.path.exists("~/logs/debug"):
-            os.remove("~/logs/debug")
+        if os.path.exists("/home/pi/logs/debug"):
+            os.remove("/home/pi/logs/debug")
             logging.getLogger().setLevel(logging.DEBUG)
             logger.debug("Entering debug logging from filesystem trigger.")
             sched.schedule(datetime.now() + timedelta(minutes=LONG_TIMEOUT), revertLoggingLevel)
