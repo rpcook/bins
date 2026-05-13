@@ -225,13 +225,14 @@ def soft_reset(sched):
     sched.statusLED.push_job("reset", 70, lambda led: LEDpatterns.solid_colour(led, (20,0,0)))
     time.sleep(1)
     sched.statusLED.remove_job("reset")
-    sched.binIndicator.reset() # reset status of bin indicator
-    # reset scheduler queue
-    sched.clearHeap()
-    sched.statusLED.clear_jobs()
-    sched.binLED.clear_jobs()
-    # assign start-up jobs to scheduler queue
-    set_initial_jobs(sched)
+    quit() # escape python script and rely on Linux system to restart process. Clean state restart.
+    # sched.binIndicator.reset() # reset status of bin indicator
+    # # reset scheduler queue
+    # sched.clearHeap()
+    # sched.statusLED.clear_jobs()
+    # sched.binLED.clear_jobs()
+    # # assign start-up jobs to scheduler queue
+    # set_initial_jobs(sched)
 
 class binSchedule: # class container for the web-scraper
     def __init__(self):
